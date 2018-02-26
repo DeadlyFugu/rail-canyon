@@ -1,0 +1,6 @@
+[submodule "extern/bigg"]
+	path = extern/bigg
+	url = https://github.com/JoshuaBrookover/bigg.git
+[submodule "extern/rwstreamlib"]
+	path = extern/rwstreamlib
+	url = https://github.com/DeadlyFugu/rwstreamlib.git
