@@ -57,13 +57,13 @@ u64 FSPath::lastModifiedTime() {
 
 #ifdef PLATFORM_WIN
 #include <Windows.h>
-vector<FSPath> FSPath::children() {
-	vector<FSPath> out;
+std::vector<FSPath> FSPath::children() {
+	std::vector<FSPath> out;
 
 	WIN32_FIND_DATA findData;
 	HANDLE h;
 
-	string strWithSlash = str + "\\*";
+	std::string strWithSlash = str + "\\*";
 	h = FindFirstFile(strWithSlash.c_str(), &findData);
 	bool hasNextFile = true;
 

@@ -21,6 +21,7 @@ class VisibilityManager {
 	};
 	std::vector<VisibilityBlock> blocks;
 public:
+	bool forceShowAll = false;
 	bool isVisible(int chunkId, glm::vec3 camPos);
 	void read(rc::util::FSPath& blkFile);
 };

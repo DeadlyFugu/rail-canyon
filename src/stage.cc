@@ -37,9 +37,14 @@ void Stage::draw(glm::vec3 camPos) {
 			model.draw();
 		}
 	}
+	ImGui::Begin("Visibility");
+	ImGui::Checkbox("Force Show All", &visibilityManager.forceShowAll);
+	ImGui::End();
 }
 
 bool VisibilityManager::isVisible(int chunkId, glm::vec3 camPos) {
+	if (forceShowAll) return true;
+
 	i32 x = (i32) camPos.x;
 	i32 y = (i32) camPos.y;
 	i32 z = (i32) camPos.z;

@@ -16,18 +16,20 @@ private:
 	Stage* stage;
 	TexDictionary* txd;
 public:
-	RailCanyonApp() : camera(glm::vec3(0.f, 100.f, 350.f), glm::vec3(0,0,0), 60, 1.f, 64000.f) {}
+	RailCanyonApp() : camera(glm::vec3(0.f, 100.f, 350.f), glm::vec3(0,0,0), 60, 1.f, 960000.f) {}
 private:
 	void initialize( int _argc, char** _argv ) override {
 		bgfx::setDebug( BGFX_DEBUG_TEXT );
 		mTime = 0.0f;
 
-		rc::util::FSPath onePath("/Users/matt/Shared/testONEs/s01.one");
-		rc::util::FSPath blkPath("/Users/matt/Workspace/Heroes/dvdroot/s01_blk.bin");
+#define STG_NAME "stg07"
+		rc::util::FSPath dvdroot(_argc > 1 ? _argv[1] : "D:\\Heroes\\dvdroot");
+		rc::util::FSPath onePath = dvdroot / STG_NAME ".one";
+		rc::util::FSPath blkPath = dvdroot / STG_NAME "_blk.bin";
 		rc::io::ONEArchive archive(onePath);
 
 		// read TXD
-		rc::util::FSPath txdPath("/Users/matt/Shared/testTXDs/s01.txd");
+		rc::util::FSPath txdPath = dvdroot / "textures/" STG_NAME ".txd";
 		rc::util::FSFile txdFile(txdPath);
 		auto x = txdFile.toBuffer();
 		sk::Buffer sk_x(x.base_ptr(), x.size(), false); // convert buffer utility classes
