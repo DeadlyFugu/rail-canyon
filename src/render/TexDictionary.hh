@@ -12,6 +12,7 @@ class TexDictionary {
 		rw::TextureNative* textureChunk;
 	};
 	std::vector<TextureEntry> textures;
+	int listbox_item_current = 0;
 public:
 	TexDictionary(rw::TextureDictionary* txdChunk);
 	~TexDictionary();

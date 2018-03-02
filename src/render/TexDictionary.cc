@@ -66,7 +66,6 @@ void TexDictionary::showWindow() {
 		listbox_items.push_back(tex.textureChunk->name.c_str());
 	}
 
-	static int listbox_item_current = 0;
 	ImGui::ListBox("listbox\n(single select)", &listbox_item_current, &listbox_items[0], listbox_items.size(), 4);
 
 	auto& current = textures[listbox_item_current];

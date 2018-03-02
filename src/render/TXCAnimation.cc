@@ -14,6 +14,7 @@ TXCAnimation::TXCAnimation(Buffer& data, TexDictionary* txd) {
 
 		char buffer[32];
 		data.read(buffer, 32);
+		std::string name(buffer);
 
 		int idx = txd->getTexture(buffer).idx;
 		textureLookup.insert(std::make_pair(idx, (int) (animations.size() - 1)));
@@ -35,8 +36,12 @@ TXCAnimation::TXCAnimation(Buffer& data, TexDictionary* txd) {
 			data.read(&frame);
 			if (frame.whole == 0xffffffff) break;
 
-			snprintf(bufferEnd, n, ".%d", frame.part.textureID);
-			animation.frames[frame.part.frame] = txd->getTexture(buffer);
+			if (frame.part.frame < animation.frameCount) {
+				snprintf(bufferEnd, n, ".%d", frame.part.textureID);
+				animation.frames[frame.part.frame] = txd->getTexture(buffer);
+			} else {
+				log_warn("invalid frame in txc for texture %s", name.c_str());
+			}
 		}
 
 		// hacky fix for weirdly formatted txcs?
