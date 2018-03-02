@@ -152,10 +152,10 @@ void recordStreamErrorLog(rw::util::Logger::LogLevel level, const char* str) {
 class RailCanyonApp : public bigg::Application {
 private:
 	Camera camera;
-	float mTime;
-	Stage* stage;
-	TexDictionary* txd;
-	int stageSelect;
+	float mTime = 0.0f;
+	Stage* stage = nullptr;
+	TexDictionary* txd = nullptr;
+	int stageSelect = 0;
 public:
 	RailCanyonApp() : camera(glm::vec3(0.f, 100.f, 350.f), glm::vec3(0,0,0), 60, 1.f, 960000.f) {}
 private:
@@ -179,11 +179,11 @@ private:
 
 	void openStage(const char* name) {
 		char buffer[512];
-		sprintf(buffer, "/Users/matt/Shared/testTXDs/%s.txd", name);
+		sprintf(buffer, "D:\\Heroes\\dvdroot\\textures\\%s.txd", name);
 		rc::util::FSPath txdPath(buffer);
-		sprintf(buffer, "/Users/matt/Shared/testONEs/%s.one", name);
+		sprintf(buffer, "D:\\Heroes\\dvdroot\\%s.one", name);
 		rc::util::FSPath onePath(buffer);
-		sprintf(buffer, "/Users/matt/Workspace/Heroes/dvdroot/%s_blk.bin", name);
+		sprintf(buffer, "D:\\Heroes\\dvdroot\\%s_blk.bin", name);
 		rc::util::FSPath blkPath(buffer);
 
 		if (!txdPath.exists()) {

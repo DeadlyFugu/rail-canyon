@@ -7,6 +7,21 @@ using std::unique_ptr;
 using std::shared_ptr;
 using std::move;
 
+// Platform defines
+#ifdef _WIN32
+#define PLATFORM_WIN
+#endif
+
+#ifdef __APPLE__
+#define PLATFORM_OSX
+#define PLATFORM_POSIX
+#endif
+
+#ifdef __linux__
+#define PLATFORM_LINUX
+#define PLATFORM_POSIX
+#endif
+
 #include "util/types.hh"
 using namespace rc::types;
 
@@ -26,18 +41,3 @@ inline void assert__(bool cond, const char* x, const char* msg, const char* func
 		abort();
 	}
 }
-
-// Platform defines
-#ifdef _WIN32
-#define PLATFORM_WIN
-#endif
-
-#ifdef __APPLE__
-#define PLATFORM_OSX
-#define PLATFORM_POSIX
-#endif
-
-#ifdef __linux__
-#define PLATFORM_LINUX
-	#define PLATFORM_POSIX
-#endif
