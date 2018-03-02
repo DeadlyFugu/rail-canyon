@@ -34,11 +34,14 @@ bgfx::VertexDecl BSPVertex::ms_decl;
 
 void BSPModel::clear() {
 	if (hasData) {
-		bgfx::destroy(vertices);
-		for (auto& mesh : binMeshes) {
-			bgfx::destroy(mesh.indices);
+		for (auto& section : sections) {
+			bgfx::destroy(section.vertices);
+			for (auto& mesh : section.binMeshes) {
+				bgfx::destroy(mesh.indices);
+			}
+			section.binMeshes.clear();
 		}
-		binMeshes.clear();
+		sections.clear();
 		hasData = false;
 	}
 }
@@ -90,6 +93,62 @@ BSPModel::~BSPModel() {
 	clear();
 }
 
+void BSPModel::setFromSection(rw::AbstractSectionChunk* sectionChunk) {
+	if (sectionChunk->isAtomic()) {
+		auto atomicSection = (rw::AtomicSectionChunk*) sectionChunk;
+
+		const auto vertexCount = atomicSection->vertexCount;
+		const auto& vertexPositions = atomicSection->vertexPositions;
+		const auto& vertexColors = atomicSection->vertexColors;
+		const auto& vertexUVs = atomicSection->vertexUVs;
+
+		sections.emplace_back();
+		auto& section = sections.back();
+		BSPVertex* meshVertices = new BSPVertex[vertexCount];
+
+		for (int i = 0; i < vertexCount; i++) {
+			const auto& vertex = vertexPositions[i];
+			const auto& color = vertexColors[i];
+			const auto& uv = vertexUVs[i];
+			meshVertices[i] = {
+					vertex.x, vertex.y, vertex.z,
+					uint32_t((color.a << 24) | (color.b << 16) | (color.g << 8) | color.r),
+					uv.u, uv.v};
+		}
+
+		section.vertices = bgfx::createVertexBuffer(
+				bgfx::makeRef(meshVertices, sizeof(BSPVertex) * vertexCount),
+				BSPVertex::ms_decl
+		);
+
+		const auto objectCount = atomicSection->binMeshPLG->objectCount;
+		log_debug("objectCount: %d", objectCount);
+		for (int bmIdx = 0; bmIdx < objectCount; bmIdx++) {
+			const auto indexCount = atomicSection->binMeshPLG->objects[bmIdx].meshIndexCount;
+			const auto& indices = atomicSection->binMeshPLG->objects[bmIdx].indices;
+			uint16_t* meshTriStrip = new uint16_t[indexCount];
+
+			for (int i = 0; i < indexCount; i++) {
+				if (indices[i] > vertexCount) log_warn("invalid index %08x", indices[i]);
+				meshTriStrip[i] = (uint16_t) indices[i];
+			}
+
+			section.binMeshes.emplace_back();
+
+			section.binMeshes[bmIdx].indices = bgfx::createIndexBuffer(
+					bgfx::makeRef(meshTriStrip, sizeof(uint16_t) * indexCount)
+			);
+
+			section.binMeshes[bmIdx].material = atomicSection->binMeshPLG->objects[bmIdx].material;
+		}
+	} else {
+		auto planeSection = (rw::PlaneSectionChunk*) sectionChunk;
+
+		setFromSection(planeSection->left);
+		setFromSection(planeSection->right);
+	}
+}
+
 void BSPModel::setFromWorldChunk(const char* name, const rw::WorldChunk& worldChunk, TexDictionary* txd) {
 	clear();
 
@@ -104,49 +163,7 @@ void BSPModel::setFromWorldChunk(const char* name, const rw::WorldChunk& worldCh
 		uMaterialBits = bgfx::createUniform("u_materialBits", bgfx::UniformType::Int1);
 	}
 
-	const auto vertexCount = worldChunk.atomicSection->vertexCount;
-	const auto& vertexPositions = worldChunk.atomicSection->vertexPositions;
-	const auto& vertexColors = worldChunk.atomicSection->vertexColors;
-	const auto& vertexUVs = worldChunk.atomicSection->vertexUVs;
-
-
-	BSPVertex* meshVertices = new BSPVertex[vertexCount];
-
-	for (int i = 0; i < vertexCount; i++) {
-		const auto& vertex = vertexPositions[i];
-		const auto& color = vertexColors[i];
-		const auto& uv = vertexUVs[i];
-		meshVertices[i] = {
-				vertex.x, vertex.y, vertex.z,
-				uint32_t((color.a << 24) | (color.b << 16) | (color.g << 8) | color.r),
-				uv.u, uv.v};
-	}
-
-	vertices = bgfx::createVertexBuffer(
-			bgfx::makeRef(meshVertices, sizeof(BSPVertex) * vertexCount),
-			BSPVertex::ms_decl
-	);
-
-	const auto objectCount = worldChunk.atomicSection->binMeshPLG->objectCount;
-	log_debug("objectCount: %d", objectCount);
-	for (int bmIdx = 0; bmIdx < objectCount; bmIdx++) {
-		const auto indexCount = worldChunk.atomicSection->binMeshPLG->objects[bmIdx].meshIndexCount;
-		const auto& indices = worldChunk.atomicSection->binMeshPLG->objects[bmIdx].indices;
-		uint16_t* meshTriStrip = new uint16_t[indexCount];
-
-		for (int i = 0; i < indexCount; i++) {
-			if (indices[i] > vertexCount) log_warn("invalid index %08x", indices[i]);
-			meshTriStrip[i] = (uint16_t) indices[i];
-		}
-
-		binMeshes.emplace_back();
-
-		binMeshes[bmIdx].indices = bgfx::createIndexBuffer(
-				bgfx::makeRef(meshTriStrip, sizeof(uint16_t) * indexCount)
-		);
-
-		binMeshes[bmIdx].material = worldChunk.atomicSection->binMeshPLG->objects[bmIdx].material;
-	}
+	setFromSection(worldChunk.rootSection);
 
 	for (auto materialChunk : worldChunk.materialList->materials) {
 		materials.emplace_back();
@@ -166,52 +183,54 @@ void BSPModel::setFromWorldChunk(const char* name, const rw::WorldChunk& worldCh
 
 void BSPModel::draw() {
 	if (hasData) {
-		for (auto& mesh : binMeshes) {
-			// set mesh
-			bgfx::setVertexBuffer( 0, vertices );
-			bgfx::setIndexBuffer( mesh.indices );
+		for (auto& section : sections) {
+			for (auto& mesh : section.binMeshes) {
+				// set mesh
+				bgfx::setVertexBuffer(0, section.vertices);
+				bgfx::setIndexBuffer(mesh.indices);
 
-			// set material
-			const auto mat = materials[mesh.material];
-			//printf("%d\n", mat.texture.idx);
-			bgfx::setTexture(0, uSamplerTexture, mat.texture);
-			float matColor[4];
-			uint32_t color = mat.color; // todo: is this RGBA or BGRA?
-			if (selected) color = 0xff8888ff;
-			matColor[0] = (color & 0xff) / 255.f;
-			matColor[1] = ((color >> 8) & 0xff) / 255.f;
-			matColor[2] = ((color >> 16) & 0xff) / 255.f;
-			matColor[3] = ((color >> 24) & 0xff) / 255.f;
-			//if (color != 0xffffffff)
-			//	log_info("Material with a color!!");
-			bgfx::setUniform(uMaterialColor, &matColor);
-			uint32_t matBits = 0;
-			if (renderBits & BIT_PUNCH_ALPHA)
-				matBits |= 1;
-			bgfx::setUniform(uMaterialBits, &matBits);
+				// set material
+				const auto mat = materials[mesh.material];
+				//printf("%d\n", mat.texture.idx);
+				bgfx::setTexture(0, uSamplerTexture, mat.texture);
+				float matColor[4];
+				uint32_t color = mat.color; // todo: is this RGBA or BGRA?
+				if (selected) color = 0xff8888ff;
+				matColor[0] = (color & 0xff) / 255.f;
+				matColor[1] = ((color >> 8) & 0xff) / 255.f;
+				matColor[2] = ((color >> 16) & 0xff) / 255.f;
+				matColor[3] = ((color >> 24) & 0xff) / 255.f;
+				//if (color != 0xffffffff)
+				//	log_info("Material with a color!!");
+				bgfx::setUniform(uMaterialColor, &matColor);
+				uint32_t matBits = 0;
+				if (renderBits & BIT_PUNCH_ALPHA)
+					matBits |= 1;
+				bgfx::setUniform(uMaterialBits, &matBits);
 
-			// set state
-			uint64_t state = BGFX_STATE_RGB_WRITE;
-			state |= BGFX_STATE_ALPHA_WRITE;
+				// set state
+				uint64_t state = BGFX_STATE_RGB_WRITE;
+				state |= BGFX_STATE_ALPHA_WRITE;
 
-			state |= BGFX_STATE_DEPTH_WRITE;
-			state |= BGFX_STATE_DEPTH_TEST_LESS;
+				state |= BGFX_STATE_DEPTH_WRITE;
+				state |= BGFX_STATE_DEPTH_TEST_LESS;
 
-			state |= BGFX_STATE_PT_TRISTRIP;
+				state |= BGFX_STATE_PT_TRISTRIP;
 
-			if (renderBits & BIT_ADDITIVE) {
-				state |= BGFX_STATE_BLEND_ADD;
+				if (renderBits & BIT_ADDITIVE) {
+					state |= BGFX_STATE_BLEND_ADD;
+				}
+				if (renderBits & BIT_FULL_ALPHA) {
+					state |= BGFX_STATE_BLEND_ALPHA | BGFX_STATE_BLEND_INDEPENDENT;
+				}
+				if (!(renderBits & BIT_NO_CULL)) {
+					state |= BGFX_STATE_CULL_CW;
+				}
+				bgfx::setState(state);
+
+				// draw
+				bgfx::submit(0, bspProgram);
 			}
-			if (renderBits & BIT_FULL_ALPHA) {
-				state |= BGFX_STATE_BLEND_ALPHA | BGFX_STATE_BLEND_INDEPENDENT;
-			}
-			if (!(renderBits & BIT_NO_CULL)) {
-				state |= BGFX_STATE_CULL_CW;
-			}
-			bgfx::setState(state);
-
-			// draw
-			bgfx::submit( 0, bspProgram );
 		}
 	}
 }

@@ -156,6 +156,7 @@ private:
 	Stage* stage = nullptr;
 	TexDictionary* txd = nullptr;
 	int stageSelect = 0;
+	char dvdroot[512] = "D:\\Heroes\\dvdroot\0";
 public:
 	RailCanyonApp() : camera(glm::vec3(0.f, 100.f, 350.f), glm::vec3(0,0,0), 60, 1.f, 960000.f) {}
 private:
@@ -179,11 +180,11 @@ private:
 
 	void openStage(const char* name) {
 		char buffer[512];
-		sprintf(buffer, "D:\\Heroes\\dvdroot\\textures\\%s.txd", name);
+		sprintf(buffer, "%s/textures/%s.txd", dvdroot, name);
 		rc::util::FSPath txdPath(buffer);
-		sprintf(buffer, "D:\\Heroes\\dvdroot\\%s.one", name);
+		sprintf(buffer, "%s/%s.one", dvdroot, name);
 		rc::util::FSPath onePath(buffer);
-		sprintf(buffer, "D:\\Heroes\\dvdroot\\%s_blk.bin", name);
+		sprintf(buffer, "%s/%s_blk.bin", dvdroot, name);
 		rc::util::FSPath blkPath(buffer);
 
 		if (!txdPath.exists()) {
@@ -268,7 +269,20 @@ private:
 		camera.use(0, (float) getWidth() / getHeight());
 		bgfx::setViewRect( 0, 0, 0, uint16_t( getWidth() ), uint16_t( getHeight() ) );
 		bgfx::touch( 0 );
-		ImGui::Begin("RailCanyon");
+		ImGui::Begin("RailCanyon v0.1");
+
+		static bool dvdrootExistsDirty = true;
+		static bool dvdrootExists = false;
+		if (ImGui::InputText("dvdroot", dvdroot, 512)) {
+			dvdrootExistsDirty = true;
+		}
+		if (dvdrootExistsDirty) {
+			rc::util::FSPath dvdrootPath(dvdroot);
+			dvdrootExists = dvdrootPath.exists();
+		}
+		if (!dvdrootExists) {
+			ImGui::TextColored(ImVec4(1.0f, 0.25f, 0.0f, 1.0f), "Path does not exist");
+		}
 
 		auto campos = camera.getPosition();
 		if (ImGui::Combo("stage", &stageSelect, stageDisplayNames, sizeof(stageDisplayNames) / sizeof(*stageDisplayNames))) {

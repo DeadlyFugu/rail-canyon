@@ -35,14 +35,20 @@ private:
 		int material; // todo: make shared_ptr?
 	};
 
-	bgfx::VertexBufferHandle vertices;
-	std::vector<BinMesh> binMeshes;
+	struct Section {
+		bgfx::VertexBufferHandle vertices;
+		std::vector<BinMesh> binMeshes;
+	};
+
+	std::vector<Section> sections;
+
 	bool hasData = false;
 	int renderBits;
 	int id;
 	std::string name;
 	void clear();
 	void parseName(const char* name);
+	void setFromSection(rw::AbstractSectionChunk* sectionChunk);
 public:
 	bool selected = false;
 	~BSPModel();
