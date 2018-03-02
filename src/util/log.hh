@@ -36,13 +36,13 @@ void log_message(const char* prefix, const char* func, const char* format, ...);
 
 #ifdef PLATFORM_WIN
 // print info message to console
-#define log_info(fmt)  rc::util::log_info_ (__func__, fmt)
+#define log_info(fmt, ...)  rc::util::log_info_ (__func__, fmt, __VA_ARGS__)
 // print warning message to console
-#define log_warn(fmt)  rc::util::log_warn_ (__func__, fmt)
+#define log_warn(fmt, ...)  rc::util::log_warn_ (__func__, fmt, __VA_ARGS__)
 // print error message to console
-#define log_error(fmt) rc::util::log_error_(__func__, fmt)
+#define log_error(fmt, ...) rc::util::log_error_(__func__, fmt, __VA_ARGS__)
 // print debug message to console
-#define log_debug(fmt) rc::util::log_debug_(__func__, fmt)
+#define log_debug(fmt, ...) rc::util::log_debug_(__func__, fmt, __VA_ARGS__)
 #else
 // print info message to console
 #define log_info(fmt...)  rc::util::log_info_ (__func__, fmt)

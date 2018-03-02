@@ -251,14 +251,43 @@ private:
 		camera.inputMoveAxis(inputMove, dt);
 
 		glm::vec2 inputLook(0,0);
-		if (glfwGetKey(this->mWindow, GLFW_KEY_UP))
-			inputLook.y += 1;
-		if (glfwGetKey(this->mWindow, GLFW_KEY_DOWN))
-			inputLook.y -= 1;
-		if (glfwGetKey(this->mWindow, GLFW_KEY_RIGHT))
-			inputLook.x += 1;
-		if (glfwGetKey(this->mWindow, GLFW_KEY_LEFT))
-			inputLook.x -= 1;
+		static bool mouseIsDragging;
+		static double mouseLastX;
+		static double mouseLastY;
+		if (glfwGetMouseButton(this->mWindow, GLFW_MOUSE_BUTTON_MIDDLE)) {
+			if (mouseIsDragging) {
+				double mouseX;
+				double mouseY;
+				glfwGetCursorPos(this->mWindow, &mouseX, &mouseY);
+
+				inputLook.x = mouseX - mouseLastX;
+				inputLook.y = -(mouseY - mouseLastY);
+				inputLook *= 0.15f;
+
+				glfwSetCursorPos(this->mWindow, this->getWidth() / 2.0, this->getHeight() / 2.0);
+				//mouseLastX = mouseX;
+				//mouseLastY = mouseY;
+			} else {
+				glfwSetInputMode(this->mWindow, GLFW_CURSOR, GLFW_CURSOR_HIDDEN);
+				printf("DISABLE\n");
+				mouseIsDragging = true;
+				glfwSetCursorPos(this->mWindow, this->getWidth() / 2.0, this->getHeight() / 2.0);
+				glfwGetCursorPos(this->mWindow, &mouseLastX, &mouseLastY);
+			}
+		} else {
+			if (glfwGetKey(this->mWindow, GLFW_KEY_UP))
+				inputLook.y += 1;
+			if (glfwGetKey(this->mWindow, GLFW_KEY_DOWN))
+				inputLook.y -= 1;
+			if (glfwGetKey(this->mWindow, GLFW_KEY_RIGHT))
+				inputLook.x += 1;
+			if (glfwGetKey(this->mWindow, GLFW_KEY_LEFT))
+				inputLook.x -= 1;
+			if (mouseIsDragging) {
+				glfwSetInputMode(this->mWindow, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+				mouseIsDragging = false;
+			}
+		}
 		camera.inputLookAxis(inputLook, dt);
 
 
