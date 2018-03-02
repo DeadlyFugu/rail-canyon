@@ -181,7 +181,7 @@ void BSPModel::setFromWorldChunk(const char* name, const rw::WorldChunk& worldCh
 	hasData = true;
 }
 
-void BSPModel::draw() {
+void BSPModel::draw(TXCAnimation* txc) {
 	if (hasData) {
 		for (auto& section : sections) {
 			for (auto& mesh : section.binMeshes) {
@@ -192,7 +192,7 @@ void BSPModel::draw() {
 				// set material
 				const auto mat = materials[mesh.material];
 				//printf("%d\n", mat.texture.idx);
-				bgfx::setTexture(0, uSamplerTexture, mat.texture);
+				bgfx::setTexture(0, uSamplerTexture, txc ? txc->getTexture(mat.texture) : mat.texture);
 				float matColor[4];
 				uint32_t color = mat.color; // todo: is this RGBA or BGRA?
 				if (selected) color = 0xff8888ff;

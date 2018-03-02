@@ -5,6 +5,7 @@
 #include <list>
 #include <bigg.hpp>
 #include "render/TexDictionary.hh"
+#include "render/TXCAnimation.hh"
 
 using rc::render::BSPModel;
 using rc::io::ONEArchive;
@@ -33,5 +34,5 @@ public:
 	~Stage();
 	void fromArchive(ONEArchive* x, TexDictionary* txd);
 	void readVisibility(rc::util::FSPath& blkFile);
-	void draw(glm::vec3 camPos);
+	void draw(glm::vec3 camPos, TXCAnimation* txc);
 };

@@ -27,6 +27,7 @@ set(RAILCANYON_CC
 		src/render/BSPModel.cc
 		src/render/Camera.cc
 		src/render/TexDictionary.cc
+		src/render/TXCAnimation.cc
 
 		# main
 		src/railcanyon.cc
@@ -49,6 +50,7 @@ set(RAILCANYON_HH
 		src/render/BSPModel.hh
 		src/render/Camera.hh
 		src/render/TexDictionary.hh
+		src/render/TXCAnimation.hh
 
 		# main
 		src/common.hh

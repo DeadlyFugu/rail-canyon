@@ -6,6 +6,7 @@
 #include "world.hh"
 #include "bgfx/bgfx.h"
 #include "render/TexDictionary.hh"
+#include "render/TXCAnimation.hh"
 
 class VisibilityManager;
 
@@ -55,7 +56,7 @@ public:
 
 	void setFromWorldChunk(const char* name, const rw::WorldChunk& worldChunk, TexDictionary* txd);
 
-	void draw();
+	void draw(TXCAnimation* txc);
 	int getId();
 	const char* getName();
 };

@@ -8,6 +8,7 @@
 
 #include "render/Camera.hh"
 #include "render/TexDictionary.hh"
+#include "render/TXCAnimation.hh"
 
 const char* stageDisplayNames[] = {
 		"<none>",
@@ -155,6 +156,8 @@ private:
 	float mTime = 0.0f;
 	Stage* stage = nullptr;
 	TexDictionary* txd = nullptr;
+	TXCAnimation* txc = nullptr;
+
 	int stageSelect = 0;
 	char dvdroot[512] = "D:\\Heroes\\dvdroot\0";
 public:
@@ -186,6 +189,8 @@ private:
 		rc::util::FSPath onePath(buffer);
 		sprintf(buffer, "%s/%s_blk.bin", dvdroot, name);
 		rc::util::FSPath blkPath(buffer);
+		sprintf(buffer, "%s/%s.txc", dvdroot, name);
+		rc::util::FSPath txcPath(buffer);
 
 		if (!txdPath.exists()) {
 			rw::util::logger.error("missing .txd");
@@ -197,6 +202,11 @@ private:
 			openTXD(txdPath);
 			openBSPWorld(onePath, blkPath);
 		}
+		if (txcPath.exists()) {
+			rc::util::FSFile txcFile(txcPath);
+			auto b = txcFile.toBuffer();
+			txc = new TXCAnimation(b, txd);
+		}
 	}
 
 	void closeStage() {
@@ -207,6 +217,10 @@ private:
 		if (txd) {
 			delete txd;
 			txd = nullptr;
+		}
+		if (txc) {
+			delete txc;
+			txc = nullptr;
 		}
 	}
 	void initialize( int _argc, char** _argv ) override {
@@ -316,6 +330,8 @@ private:
 		auto campos = camera.getPosition();
 		if (ImGui::Combo("stage", &stageSelect, stageDisplayNames, sizeof(stageDisplayNames) / sizeof(*stageDisplayNames))) {
 			closeStage();
+			camera.setPosition(eye);
+			camera.lookAt(vec3(0, 0, 0));
 			if (stageSelect) {
 				error_log.clear();
 				rw::util::logger.setPrintCallback(recordStreamErrorLog);
@@ -365,8 +381,11 @@ private:
 		if (txd)
 			txd->showWindow();
 
+		if (txc)
+			txc->setTime(mTime);
+
 		if (stage)
-			stage->draw(campos);
+			stage->draw(campos, txc);
 	}
 };
 

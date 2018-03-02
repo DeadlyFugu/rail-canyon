@@ -31,10 +31,10 @@ void Stage::readVisibility(rc::util::FSPath& blkFile) {
 	visibilityManager.read(blkFile);
 }
 
-void Stage::draw(glm::vec3 camPos) {
+void Stage::draw(glm::vec3 camPos, TXCAnimation* txc) {
 	for (auto& model : models) {
 		if (visibilityManager.isVisible(model.getId(), camPos)) {
-			model.draw();
+			model.draw(txc);
 		}
 	}
 
