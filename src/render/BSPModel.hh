@@ -40,15 +40,18 @@ private:
 	bool hasData = false;
 	int renderBits;
 	int id;
+	std::string name;
 	void clear();
 	void parseName(const char* name);
 public:
+	bool selected = false;
 	~BSPModel();
 
 	void setFromWorldChunk(const char* name, const rw::WorldChunk& worldChunk, TexDictionary* txd);
 
 	void draw();
 	int getId();
+	const char* getName();
 };
 
 }

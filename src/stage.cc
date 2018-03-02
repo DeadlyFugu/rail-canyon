@@ -37,8 +37,25 @@ void Stage::draw(glm::vec3 camPos) {
 			model.draw();
 		}
 	}
-	ImGui::Begin("Visibility");
+
+	ImGui::Begin("Stage");
 	ImGui::Checkbox("Force Show All", &visibilityManager.forceShowAll);
+	if (ImGui::CollapsingHeader("Visibility List")) {
+		for (auto& model : models) {
+			if (visibilityManager.isVisible(model.getId(), camPos)) {
+				ImGui::LabelText("visible", "%s", model.getName());
+			}
+		}
+	}
+	if (ImGui::CollapsingHeader("Chunks")) {
+		for (auto& model : models) {
+			ImGui::PushID(model.getName());
+			ImGui::LabelText("chunk", "%s", model.getName());
+			ImGui::Checkbox("selected", &model.selected);
+			ImGui::LabelText("visible", "%s", visibilityManager.isVisible(model.getId(), camPos) ? "yes" : "no");
+			ImGui::PopID();
+		}
+	}
 	ImGui::End();
 }
 

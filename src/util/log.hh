@@ -34,32 +34,40 @@ namespace util {
 // prints message
 void log_message(const char* prefix, const char* func, const char* format, ...);
 
+#ifdef PLATFORM_WIN
 // print info message to console
 #define log_info(fmt)  rc::util::log_info_ (__func__, fmt)
+// print warning message to console
+#define log_warn(fmt)  rc::util::log_warn_ (__func__, fmt)
+// print error message to console
+#define log_error(fmt) rc::util::log_error_(__func__, fmt)
+// print debug message to console
+#define log_debug(fmt) rc::util::log_debug_(__func__, fmt)
+#else
+// print info message to console
+#define log_info(fmt...)  rc::util::log_info_ (__func__, fmt)
+// print warning message to console
+#define log_warn(fmt...)  rc::util::log_warn_ (__func__, fmt)
+// print error message to console
+#define log_error(fmt...) rc::util::log_error_(__func__, fmt)
+// print debug message to console
+#define log_debug(fmt...) rc::util::log_debug_(__func__, fmt)
+#endif
 
 template<typename... Args>
 void log_info_(const char* func, const char* format, Args... args) {
 	log_message(MSG_BEGIN ANSI_BLUE "info" ANSI_RESET MSG_END, func, format, args...);
 }
 
-// print warning message to console
-#define log_warn(fmt)  rc::util::log_warn_ (__func__, fmt)
-
 template<typename... Args>
 void log_warn_(const char* func, const char* format, Args... args) {
 	log_message(MSG_BEGIN ANSI_YELLOW "warn" ANSI_RESET MSG_END, func, format, args...);
 }
 
-// print error message to console
-#define log_error(fmt) rc::util::log_error_(__func__, fmt)
-
 template<typename... Args>
 void log_error_(const char* func, const char* format, Args... args) {
 	log_message(MSG_BEGIN ANSI_RED "error" ANSI_RESET MSG_END, func, format, args...);
 }
-
-// print debug message to console
-#define log_debug(fmt) rc::util::log_debug_(__func__, fmt)
 
 template<typename... Args>
 void log_debug_(const char* func, const char* format, Args... args) {

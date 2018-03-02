@@ -93,6 +93,7 @@ BSPModel::~BSPModel() {
 void BSPModel::setFromWorldChunk(const char* name, const rw::WorldChunk& worldChunk, TexDictionary* txd) {
 	clear();
 
+	this->name = name;
 	parseName(name);
 
 	if (!bspStaticValuesLoaded) {
@@ -176,12 +177,13 @@ void BSPModel::draw() {
 			bgfx::setTexture(0, uSamplerTexture, mat.texture);
 			float matColor[4];
 			uint32_t color = mat.color; // todo: is this RGBA or BGRA?
+			if (selected) color = 0xff8888ff;
 			matColor[0] = (color & 0xff) / 255.f;
 			matColor[1] = ((color >> 8) & 0xff) / 255.f;
 			matColor[2] = ((color >> 16) & 0xff) / 255.f;
 			matColor[3] = ((color >> 24) & 0xff) / 255.f;
-			if (color != 0xffffffff)
-				log_info("Material with a color!!");
+			//if (color != 0xffffffff)
+			//	log_info("Material with a color!!");
 			bgfx::setUniform(uMaterialColor, &matColor);
 			uint32_t matBits = 0;
 			if (renderBits & BIT_PUNCH_ALPHA)
@@ -216,6 +218,10 @@ void BSPModel::draw() {
 
 int BSPModel::getId() {
 	return id;
+}
+
+const char* BSPModel::getName() {
+	return name.c_str();
 }
 
 }
