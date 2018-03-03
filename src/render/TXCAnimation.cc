@@ -1,3 +1,5 @@
+#include "util/fspath.hh"
+#include "util/fsfile.hh"
 #include "TXCAnimation.hh"
 
 TXCAnimation::TXCAnimation(Buffer& data, TexDictionary* txd) {
@@ -8,16 +10,17 @@ TXCAnimation::TXCAnimation(Buffer& data, TexDictionary* txd) {
 		auto& animation = animations.back();
 
 		animation.frameCount = value;
+		log_info("frameCount %d", value);
 		animation.frames.resize(value);
 
 		data.seek(data.tell() + 516);
 
 		char buffer[32];
 		data.read(buffer, 32);
-		animation.firstFrame = std::string(buffer);
+		animation.replaceTexture = std::string(buffer);
 
-		int firstTextureIdx = txd->getTexture(buffer).idx;
-		textureLookup.insert(std::make_pair(firstTextureIdx, (int) (animations.size() - 1)));
+		int replaceIdx = txd->getTexture(buffer).idx;
+		textureLookup.insert(std::make_pair(replaceIdx, (int) (animations.size() - 1)));
 
 		data.read(buffer, 32);
 		animation.name = std::string(buffer);
@@ -27,6 +30,7 @@ TXCAnimation::TXCAnimation(Buffer& data, TexDictionary* txd) {
 		size_t n = buffer + 32 - bufferEnd;
 
 		int previousFrameID = 0;
+		u16 bonusFinalDuration = 0; // counteract odd 'offset by 1' animations
 		auto& frameDatas = animation.frameDeltas;
 		while (true) {
 			// read frame
@@ -34,21 +38,19 @@ TXCAnimation::TXCAnimation(Buffer& data, TexDictionary* txd) {
 			data.read(&frame);
 			if (frame.frameID == 0xffff) break;
 
-			// add frame to optimized storage
-			// todo: generate this afterwards from editor deltas
-			if (frame.frameID < animation.frameCount) {
-				snprintf(bufferEnd, n, ".%d", frame.textureID);
-				animation.frames[frame.frameID] = txd->getTexture(buffer);
-			} else {
+			if (frame.frameID >= animation.frameCount || frame.frameID < previousFrameID) {
 				log_warn("invalid frame in txc for texture %s", animation.name.c_str());
+				continue;
 			}
 
-			// add extra frame at start for txcs missing it
+			// add frame to optimized storage
+			// todo: generate this afterwards from editor deltas
+			snprintf(bufferEnd, n, ".%d", frame.textureID);
+			animation.frames[frame.frameID] = txd->getTexture(buffer);
+
+			// add duration to final frame for offset txcs
 			if (frameDatas.size() == 0 && frame.frameID != 0) {
-				FrameDeltaData delta;
-				delta.textureID = 1;
-				delta.duration = 0;
-				frameDatas.push_back(delta);
+				bonusFinalDuration = frame.frameID;
 			}
 
 			// add frame delta for editing
@@ -65,10 +67,10 @@ TXCAnimation::TXCAnimation(Buffer& data, TexDictionary* txd) {
 		}
 
 		if (frameDatas.size() > 0) {
-			frameDatas[frameDatas.size() - 1].duration = (u16) (animation.frameCount - previousFrameID);
+			frameDatas[frameDatas.size() - 1].duration = (u16) (animation.frameCount - previousFrameID) + bonusFinalDuration;
 		}
 
-		uint16_t lastIndex = firstTextureIdx;
+		uint16_t lastIndex = replaceIdx;
 		for (int i = 0; i < animation.frameCount; i++) {
 			if (animation.frames[i].idx == 0) {
 				animation.frames[i].idx = lastIndex;
@@ -101,152 +103,224 @@ bgfx::TextureHandle TXCAnimation::getTexture(bgfx::TextureHandle lookup) {
 		if (animFrame < 0) animFrame = 0;
 		if (animFrame >= totalFrames) animFrame = totalFrames - 1;
 
-		return animation.frames[animFrame];
+		if (totalFrames == 0) return {0};
+		else return animation.frames[animFrame];
 	}
 }
 
 void TXCAnimation::showUI(TexDictionary* txd) {
 	ImGui::Begin("TXC Animation");
 
+	bool mappingModified = false;
+
 	std::vector<const char*> items;
 	for (auto& animation : animations) {
 		items.push_back(animation.name.c_str());
 	}
 	ImGui::ListBox("Animation", &listbox_sel, &items[0], items.size());
-	ImGui::Button("new");
-	ImGui::SameLine();
-	ImGui::Button("delete");
-	ImGui::Separator();
-
-	auto& animation = animations[listbox_sel];
-	char name[32];
-	strncpy(name, animation.name.c_str(), 32);
-	char frame1[32];
-	strncpy(frame1, animation.firstFrame.c_str(), 32);
-
-	// animation properties
-	union BiggImTexture { ImTextureID ptr; struct { uint16_t flags; bgfx::TextureHandle handle; } s; };
-	BiggImTexture img;
-	img.s.flags = 0; // unused
-	img.s.handle = getTexture(animation.frames[0]);
-	ImGui::Image(img.ptr, ImVec2(64, 64));
-	if (ImGui::InputText("name", name, 30)) {
-		snprintf(frame1, 32, "%s.1", name);
+	if (ImGui::Button("new")) {
+		animations.emplace_back();
+		auto& anim = animations.back();
+		anim.name = "name";
+		anim.replaceTexture = "name.1";
+		anim.frameCount = 0;
+		listbox_sel = (unsigned) animations.size() - 1;
+		mappingModified = true;
 	}
-	ImGui::InputText("frame1", frame1, 32);
+	ImGui::SameLine();
+	if (ImGui::Button("delete")) {
+		animations.erase(animations.begin() + listbox_sel);
+		if (listbox_sel >= animations.size()) listbox_sel--;
+		mappingModified = true;
+	}
+	ImGui::SameLine();
+	if (ImGui::Button("save all")) {
+		rc::util::FSPath outPath("out.txc");
+		rc::util::FSFile out(outPath);
+
+		for (auto& animation : animations) {
+			auto frameCountOffs = out.tell();
+			out.write(0);
+
+			u32 zeroes[129];
+			for (int i = 0; i < 129; i++) zeroes[i] = 0;
+
+			out.write(zeroes, 516);
+
+			char buffer[32];
+			for (int i = 0; i < 32; i++) buffer[i] = 0;
+			strncpy(buffer, animation.name.c_str(), 32);
+			out.write(buffer, 32);
+
+			for (int i = 0; i < 32; i++) buffer[i] = 0;
+			strncpy(buffer, animation.replaceTexture.c_str(), 32);
+			out.write(buffer, 32);
+
+			u16 offset = 0;
+			for (auto& frame : animation.frameDeltas) {
+				out.write(offset);
+				out.write(frame.textureID);
+				offset += frame.duration;
+			}
+			auto returnOffs = out.tell();
+			out.seek(frameCountOffs);
+			u32 frameCount = offset;
+			out.write(frameCount);
+			out.seek(returnOffs);
+
+			out.write((u32) 0xffffffff);
+		}
+		out.write((u32) 0xffffffff);
+	}
 	ImGui::Separator();
 
-	bool deltasModified = false;
+	if (listbox_sel >= 0 && listbox_sel < animations.size()) {
+		bool deltasModified = false;
 
-	// automatic frame generation
-	// todo: below static values should be fields and auto determined on file load
-	static int generate_begin_frame = 1;
-	static int generate_end_frame = 1;
-	static int generate_frame_duration = 2;
-	static bool generate_auto = false;
-	bool generate_dirty = false;
-	if (ImGui::DragInt("First Texture", &generate_begin_frame, 0.1f, 1, 99)) generate_dirty = true;
-	if (ImGui::DragInt("Last Texture", &generate_end_frame, 0.1f, 1, 99)) generate_dirty = true;
-	if (ImGui::DragInt("Frame Duration", &generate_frame_duration, 0.1f, 1, 99)) generate_dirty = true;
-	if (ImGui::Button("Generate") || generate_auto) {
+		auto& animation = animations[listbox_sel];
+		char name[32];
+		strncpy(name, animation.name.c_str(), 32);
+		char replaceTexture[32];
+		strncpy(replaceTexture, animation.replaceTexture.c_str(), 32);
+
+		// animation properties
+		union BiggImTexture {
+			ImTextureID ptr;
+			struct {
+				uint16_t flags;
+				bgfx::TextureHandle handle;
+			} s;
+		};
+		BiggImTexture img;
+		img.s.flags = 0; // unused
+		img.s.handle = getTexture(txd->getTexture(animation.replaceTexture.c_str()));
+		ImGui::Image(img.ptr, ImVec2(64, 64));
+
+		if (ImGui::InputText("name", name, 30)) {
+			animation.name = std::string(name);
+			snprintf(replaceTexture, 32, "%s.1", name);
+			deltasModified = true;
+		}
+		if (ImGui::InputText("replaces", replaceTexture, 32)) {
+			animation.replaceTexture = std::string(replaceTexture);
+			mappingModified = true;
+		}
+		ImGui::Separator();
+
+		// automatic frame generation
+		// todo: below static values should be fields and auto determined on file load
+		static int generate_begin_frame = 1;
+		static int generate_end_frame = 1;
+		static int generate_frame_duration = 2;
+		static bool generate_auto = false;
+		bool generate_dirty = false;
+		if (ImGui::DragInt("First Texture", &generate_begin_frame, 0.1f, 1, 99)) generate_dirty = true;
+		if (ImGui::DragInt("Last Texture", &generate_end_frame, 0.1f, 1, 99)) generate_dirty = true;
+		if (ImGui::DragInt("Frame Duration", &generate_frame_duration, 0.1f, 1, 99)) generate_dirty = true;
+		if (ImGui::Button("Generate") || generate_auto) {
+			auto& frameDeltas = animation.frameDeltas;
+			frameDeltas.clear();
+			int i = generate_begin_frame;
+			do {
+				FrameDeltaData delta;
+				delta.duration = (u16) generate_frame_duration;
+				delta.textureID = (u16) i;
+				frameDeltas.push_back(delta);
+			} while ((generate_begin_frame < generate_end_frame ? i++ : i--) != generate_end_frame);
+			deltasModified = true;
+		}
+		ImGui::SameLine();
+		ImGui::Checkbox("generate automatically", &generate_auto);
+		ImGui::Separator();
+
+		// manual frame editing
+		ImGui::Columns(3);
+		ImGui::TextUnformatted("Texture");
+		ImGui::NextColumn();
+		ImGui::TextUnformatted("Duration");
+		ImGui::NextColumn();
+		ImGui::TextUnformatted("Actions");
+		ImGui::NextColumn();
+		unsigned i = 0;
+		unsigned action = 0; // 1: insert after, 2: swap, 3: delete
+		unsigned action_self = 0; // index of action
+		unsigned action_other = 0; // index of other (for swap only)
 		auto& frameDeltas = animation.frameDeltas;
-		frameDeltas.clear();
-		int i = generate_begin_frame;
-		do {
-			FrameDeltaData delta;
-			delta.duration = (u16) generate_frame_duration;
-			delta.textureID = (u16) i;
-			frameDeltas.push_back(delta);
-		} while ((generate_begin_frame < generate_end_frame ? i++ : i--) != generate_end_frame);
-		deltasModified = true;
-	}
-	ImGui::SameLine();
-	ImGui::Checkbox("generate automatically", &generate_auto);
-	ImGui::Separator();
+		for (auto& frame : frameDeltas) {
+			int duration = frame.duration;
+			int textureID = frame.textureID;
+			ImGui::PushID(i);
+			if (ImGui::DragInt("##texture", &textureID, 0.1f, 0, 99)) {
+				frame.textureID = (u16) textureID;
+				deltasModified = true;
+			}
+			ImGui::NextColumn();
+			if (ImGui::DragInt("##duration", &duration, 0.1f, 0, animation.frameCount)) {
+				frame.duration = (u16) duration;
+				deltasModified = true;
+			}
+			ImGui::NextColumn();
+			if (ImGui::Button("...")) {
+				ImGui::OpenPopup("Actions");
+			}
+			if (ImGui::BeginPopup("Actions")) {
+				if (ImGui::MenuItem("Insert Before")) {
+					action = 1;
+					action_self = i;
+				}
+				if (ImGui::MenuItem("Insert After")) {
+					action = 1;
+					action_self = i + 1;
+				}
+				ImGui::Separator();
+				if (ImGui::MenuItem("Move Up", nullptr, false, i > 0)) {
+					action = 2;
+					action_self = i;
+					action_other = i - 1;
+				}
+				if (ImGui::MenuItem("Move Down", nullptr, false, i < frameDeltas.size() - 1)) {
+					action = 2;
+					action_self = i;
+					action_other = i + 1;
+				}
+				ImGui::Separator();
+				if (ImGui::MenuItem("Delete")) {
+					action = 3;
+					action_self = i;
+				}
+				ImGui::EndPopup();
+			}
+			ImGui::NextColumn();
+			ImGui::PopID();
+			i++;
+		}
+		ImGui::Columns(1);
 
-	// manual frame editing
-	ImGui::Columns(3);
-	ImGui::TextUnformatted("Texture");
-	ImGui::NextColumn();
-	ImGui::TextUnformatted("Duration");
-	ImGui::NextColumn();
-	ImGui::TextUnformatted("Actions");
-	ImGui::NextColumn();
-	unsigned i = 0;
-	unsigned action = 0; // 1: insert after, 2: swap, 3: delete
-	unsigned action_self = 0; // index of action
-	unsigned action_other = 0; // index of other (for swap only)
-	auto& frameDeltas = animation.frameDeltas;
-	for (auto& frame : frameDeltas) {
-		int duration = frame.duration;
-		int textureID = frame.textureID;
-		ImGui::PushID(i);
-		if (ImGui::DragInt("##texture", &textureID, 0.1f, 0, 99)) {
-			frame.textureID = (u16) textureID;
+		if (action) {
+			log_debug("action");
+			if (action == 1) { // insert
+				log_debug("insert");
+				FrameDeltaData delta;
+				delta.duration = 1;
+				delta.textureID = 1;
+				frameDeltas.insert(frameDeltas.begin() + action_self, delta);
+			} else if (action == 2) { // swap
+				log_debug("swap");
+				std::iter_swap(frameDeltas.begin() + action_self, frameDeltas.begin() + action_other);
+			} else if (action == 3) { // delete
+				log_debug("delete");
+				frameDeltas.erase(frameDeltas.begin() + action_self);
+			}
 			deltasModified = true;
 		}
-		ImGui::NextColumn();
-		if (ImGui::DragInt("##duration", &duration, 0.1f, 0, animation.frameCount)) {
-			frame.duration = (u16) duration;
-			deltasModified = true;
-		}
-		ImGui::NextColumn();
-		if (ImGui::Button("...")) {
-			ImGui::OpenPopup("Actions");
-		}
-		if (ImGui::BeginPopup("Actions")) {
-			if (ImGui::MenuItem("Insert Before")) {
-				action = 1;
-				action_self = i;
-			}
-			if (ImGui::MenuItem("Insert After")) {
-				action = 1;
-				action_self = i + 1;
-			}
-			ImGui::Separator();
-			if (ImGui::MenuItem("Move Up", nullptr, false, i > 0)) {
-				action = 2;
-				action_self = i;
-				action_other = i - 1;
-			}
-			if (ImGui::MenuItem("Move Down", nullptr, false, i < frameDeltas.size() - 1)) {
-				action = 2;
-				action_self = i;
-				action_other = i + 1;
-			}
-			ImGui::Separator();
-			if (ImGui::MenuItem("Delete")) {
-				action = 3;
-				action_self = i;
-			}
-			ImGui::EndPopup();
-		}
-		ImGui::NextColumn();
-		ImGui::PopID();
-		i++;
-	}
-	ImGui::Columns(1);
 
-	if (action) {
-		log_debug("action");
-		if (action == 1) { // insert
-			log_debug("insert");
-			FrameDeltaData delta;
-			delta.duration = 1;
-			delta.textureID = 1;
-			frameDeltas.insert(frameDeltas.begin() + action_self, delta);
-		} else if (action == 2) { // swap
-			log_debug("swap");
-			std::iter_swap(frameDeltas.begin() + action_self, frameDeltas.begin() + action_other);
-		} else if (action == 3) { // delete
-			log_debug("delete");
-			frameDeltas.erase(frameDeltas.begin() + action_self);
+		if (deltasModified) {
+			recalcFrames(animation, txd);
 		}
-		deltasModified = true;
 	}
 
-	if (deltasModified) {
-		recalcFrames(animation, txd);
+	if (mappingModified) {
+		recalcMapping(txd);
 	}
 
 	ImGui::End();
@@ -283,4 +357,15 @@ void TXCAnimation::recalcFrames(TXCAnimation::AnimatedTexture& animation, TexDic
 	}
 
 	animation.frameCount = i;
+}
+
+void TXCAnimation::recalcMapping(TexDictionary* txd) {
+	textureLookup.clear();
+
+	int i = 0;
+	for (auto& animation : animations) {
+		int replaceIdx = txd->getTexture(animation.replaceTexture.c_str()).idx;
+		textureLookup.insert(std::make_pair(replaceIdx, i));
+		i++;
+	}
 }

@@ -24,7 +24,7 @@ public:
 	};
 	struct AnimatedTexture {
 		std::string name;
-		std::string firstFrame;
+		std::string replaceTexture;
 		u32 frameCount;
 		std::vector<bgfx::TextureHandle> frames; // optimized layout for lookups
 		std::vector<FrameDeltaData> frameDeltas; // used for editing
@@ -40,4 +40,5 @@ public:
 private:
 	bgfx::TextureHandle getTextureNumbered(TexDictionary* txd, AnimatedTexture& anim, int number);
 	void recalcFrames(AnimatedTexture& animation, TexDictionary* txd);
+	void recalcMapping(TexDictionary* txd);
 };
