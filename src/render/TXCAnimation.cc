@@ -149,11 +149,11 @@ void TXCAnimation::showUI(TexDictionary* txd) {
 
 			char buffer[32];
 			for (int i = 0; i < 32; i++) buffer[i] = 0;
-			strncpy(buffer, animation.name.c_str(), 32);
+			strncpy(buffer, animation.replaceTexture.c_str(), 32);
 			out.write(buffer, 32);
 
 			for (int i = 0; i < 32; i++) buffer[i] = 0;
-			strncpy(buffer, animation.replaceTexture.c_str(), 32);
+			strncpy(buffer, animation.name.c_str(), 32);
 			out.write(buffer, 32);
 
 			u16 offset = 0;
