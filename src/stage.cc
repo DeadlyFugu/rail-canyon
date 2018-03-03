@@ -1,6 +1,3 @@
-// $DESC$
-// © Sekien 2018
-
 #include "common.hh"
 #include "stage.hh"
 

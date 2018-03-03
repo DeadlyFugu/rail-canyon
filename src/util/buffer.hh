@@ -1,4 +1,4 @@
-// buffer.cc: Managed memory blocks
+// Managed memory blocks
 // todo: use rwstreamlib's buffer objects instead
 
 #pragma once

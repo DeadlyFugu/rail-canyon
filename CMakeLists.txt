@@ -19,6 +19,7 @@ set(RAILCANYON_CC
 		src/util/fspath.cc
 		src/util/log.cc
 		src/util/prs.cc
+		src/util/config.cc
 
 		# io
 		src/io/ONEArchive.cc
@@ -42,6 +43,7 @@ set(RAILCANYON_HH
 		src/util/log.hh
 		src/util/prs.hh
 		src/util/types.hh
+		src/util/config.hh
 
 		# io
 		src/io/ONEArchive.hh

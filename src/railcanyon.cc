@@ -9,6 +9,7 @@
 #include "render/Camera.hh"
 #include "render/TexDictionary.hh"
 #include "render/TXCAnimation.hh"
+#include "util/config.hh"
 
 const char* stageDisplayNames[] = {
 		"<none>",
@@ -224,6 +225,11 @@ private:
 		}
 	}
 	void initialize( int _argc, char** _argv ) override {
+		// read config
+		const char* dvdroot_ = config_get("dvdroot", dvdroot);
+		strncpy(dvdroot, dvdroot_, 512);
+
+		// setup bgfx
 		bgfx::setDebug( BGFX_DEBUG_TEXT );
 		mTime = 0.0f;
 		reset(BGFX_RESET_VSYNC);
@@ -314,7 +320,7 @@ private:
 		bgfx::touch( 0 );
 		ImGui::Begin("RailCanyon v0.2 [pre-release]");
 
-		static bool dvdrootExistsDirty = true;
+		static bool dvdrootExistsDirty = false;
 		static bool dvdrootExists = false;
 		if (ImGui::InputText("dvdroot", dvdroot, 512)) {
 			dvdrootExistsDirty = true;
@@ -322,6 +328,11 @@ private:
 		if (dvdrootExistsDirty) {
 			rc::util::FSPath dvdrootPath(dvdroot);
 			dvdrootExists = dvdrootPath.exists();
+
+			if (dvdrootExists) {
+				config_set("dvdroot", dvdroot);
+			}
+			dvdrootExistsDirty = false;
 		}
 		if (!dvdrootExists) {
 			ImGui::TextColored(ImVec4(1.0f, 0.25f, 0.0f, 1.0f), "Path does not exist");

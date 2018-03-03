@@ -1,5 +1,3 @@
-// $DESC$
-// © Sekien 2018
 #include "Camera.hh"
 
 #include <glm/gtc/matrix_transform.hpp>
