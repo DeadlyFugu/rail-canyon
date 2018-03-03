@@ -36,7 +36,7 @@ public:
 	void setTime(float time);
 	bgfx::TextureHandle getTexture(bgfx::TextureHandle lookup);
 
-	void showUI(TexDictionary* txd);
+	void drawUI(TexDictionary* txd);
 private:
 	bgfx::TextureHandle getTextureNumbered(TexDictionary* txd, AnimatedTexture& anim, int number);
 	void recalcFrames(AnimatedTexture& animation, TexDictionary* txd);

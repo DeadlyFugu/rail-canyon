@@ -151,6 +151,8 @@ void recordStreamErrorLog(rw::util::Logger::LogLevel level, const char* str) {
 	log_error(str);
 }
 
+static auto cameraStartPos = glm::vec3(0.0f, 10.0f, 35.0f );
+
 class RailCanyonApp : public bigg::Application {
 private:
 	Camera camera;
@@ -161,6 +163,7 @@ private:
 
 	int stageSelect = 0;
 	char dvdroot[512] = "D:\\Heroes\\dvdroot\0";
+	bool showTestWindow = false;
 public:
 	RailCanyonApp() : camera(glm::vec3(0.f, 100.f, 350.f), glm::vec3(0,0,0), 60, 1.f, 960000.f) {}
 private:
@@ -245,9 +248,69 @@ private:
 		bgfx::setViewRect( 0, 0, 0, uint16_t( getWidth() ), uint16_t( getHeight() ) );
 	}
 
+	void drawMainUI() {
+		ImGui::Text("RailCanyon v0.2 [pre-release]");
+
+		static bool dvdrootExistsDirty = true;
+		static bool dvdrootExists = false;
+		if (ImGui::InputText("dvdroot", dvdroot, 512)) {
+			dvdrootExistsDirty = true;
+		}
+		if (dvdrootExistsDirty) {
+			rc::util::FSPath dvdrootPath(dvdroot);
+			dvdrootExists = dvdrootPath.exists();
+
+			if (dvdrootExists) {
+				config_set("dvdroot", dvdroot);
+			}
+			dvdrootExistsDirty = false;
+		}
+		if (!dvdrootExists) {
+			ImGui::TextColored(ImVec4(1.0f, 0.25f, 0.0f, 1.0f), "Path does not exist");
+		}
+
+		if (ImGui::Combo("stage", &stageSelect, stageDisplayNames, sizeof(stageDisplayNames) / sizeof(*stageDisplayNames))) {
+			closeStage();
+			camera.setPosition(cameraStartPos);
+			camera.lookAt(vec3(0, 0, 0));
+			if (stageSelect) {
+				error_log.clear();
+				rw::util::logger.setPrintCallback(recordStreamErrorLog);
+				openStage(stageFileNames[stageSelect]);
+				rw::util::logger.setPrintCallback(rw::util::logger.getDefaultPrintCallback());
+				if (error_log.size() > 0) {
+					log_info("open popup");
+					ImGui::OpenPopup("Error Log");
+				}
+			}
+		}
+
+		if (ImGui::BeginPopupModal("Error Log", NULL, ImGuiWindowFlags_AlwaysAutoResize))
+		{
+			ImGui::Text("Errors occured opening stage:\n");
+
+			ImGui::BeginChild("scrolling", ImVec2(500,300), true, ImGuiWindowFlags_HorizontalScrollbar);
+			for (auto& line : error_log) {
+				ImGui::TextUnformatted(line.c_str());
+			}
+			ImGui::EndChild();
+
+			if (ImGui::Button("OK", ImVec2(200, 0))) {
+				ImGui::CloseCurrentPopup();
+			}
+			ImGui::EndPopup();
+		}
+
+		static bool vsync = true;
+		if (ImGui::Checkbox("vsync", &vsync)) {
+			reset(vsync ? BGFX_RESET_VSYNC : 0);
+		}
+
+		ImGui::Checkbox("test window", &showTestWindow);
+	}
+
 	void update( float dt ) override {
 		mTime += dt;
-		static auto eye = glm::vec3(0.0f, 10.0f, 35.0f );
 //		glm::mat4 view = glm::lookAt(eye, glm::vec3(0.0f, 0.0f, 0.0f ), glm::vec3(0.0f, 1.0f, 0.0f ) );
 //		glm::mat4 proj = bigg::perspective( glm::radians( 60.0f ), float( getWidth() ) / getHeight(), 0.1f, 16000.0f );
 //		bgfx::setViewTransform( 0, &view[0][0], &proj[0][0] );
@@ -318,64 +381,8 @@ private:
 		camera.use(0, (float) getWidth() / getHeight());
 		bgfx::setViewRect( 0, 0, 0, uint16_t( getWidth() ), uint16_t( getHeight() ) );
 		bgfx::touch( 0 );
-		ImGui::Begin("RailCanyon v0.2 [pre-release]");
-
-		static bool dvdrootExistsDirty = false;
-		static bool dvdrootExists = false;
-		if (ImGui::InputText("dvdroot", dvdroot, 512)) {
-			dvdrootExistsDirty = true;
-		}
-		if (dvdrootExistsDirty) {
-			rc::util::FSPath dvdrootPath(dvdroot);
-			dvdrootExists = dvdrootPath.exists();
-
-			if (dvdrootExists) {
-				config_set("dvdroot", dvdroot);
-			}
-			dvdrootExistsDirty = false;
-		}
-		if (!dvdrootExists) {
-			ImGui::TextColored(ImVec4(1.0f, 0.25f, 0.0f, 1.0f), "Path does not exist");
-		}
 
 		auto campos = camera.getPosition();
-		if (ImGui::Combo("stage", &stageSelect, stageDisplayNames, sizeof(stageDisplayNames) / sizeof(*stageDisplayNames))) {
-			closeStage();
-			camera.setPosition(eye);
-			camera.lookAt(vec3(0, 0, 0));
-			if (stageSelect) {
-				error_log.clear();
-				rw::util::logger.setPrintCallback(recordStreamErrorLog);
-				openStage(stageFileNames[stageSelect]);
-				rw::util::logger.setPrintCallback(rw::util::logger.getDefaultPrintCallback());
-				if (error_log.size() > 0) {
-					log_info("open popup");
-					ImGui::OpenPopup("Error Log");
-				}
-			}
-		}
-		if (ImGui::BeginPopupModal("Error Log", NULL, ImGuiWindowFlags_AlwaysAutoResize))
-		{
-			ImGui::Text("Errors occured opening stage:\n");
-
-			ImGui::BeginChild("scrolling", ImVec2(500,300), true, ImGuiWindowFlags_HorizontalScrollbar);
-			for (auto& line : error_log) {
-				ImGui::TextUnformatted(line.c_str());
-			}
-			ImGui::EndChild();
-
-			if (ImGui::Button("OK", ImVec2(200, 0))) {
-				ImGui::CloseCurrentPopup();
-			}
-			ImGui::EndPopup();
-		}
-		ImGui::LabelText("campos", "%f, %f, %f", campos.x, campos.y, campos.z);
-		static bool vsync = true;
-		if (ImGui::Checkbox("vsync", &vsync)) {
-			reset(vsync ? BGFX_RESET_VSYNC : 0);
-		}
-		ImGui::End();
-
 		static bool showOverlay = true;
 		ImGui::SetNextWindowPos(ImVec2(10,10));
 		if (ImGui::Begin("dispoverlay", &showOverlay, ImVec2(240,0), 0.3f, ImGuiWindowFlags_NoTitleBar|ImGuiWindowFlags_NoResize|ImGuiWindowFlags_NoMove|ImGuiWindowFlags_NoSavedSettings))
@@ -387,18 +394,65 @@ private:
 		}
 		ImGui::End();
 
-		ImGui::ShowTestWindow(nullptr);
+		ImGui::SetNextWindowPos(ImVec2(10, 85));
+		static bool showSidePanel;
+		ImGui::SetNextWindowSize(ImVec2(300, getHeight() - 145.0f), ImGuiCond_Always);
+		if (ImGui::Begin("sidepanel", &showSidePanel, ImVec2(300, getHeight() - 145.0f), -1.0f, ImGuiWindowFlags_NoTitleBar|ImGuiWindowFlags_NoResize|ImGuiWindowFlags_NoMove|ImGuiWindowFlags_NoSavedSettings)) {
+			const char* menus[] = {
+					"Main",
+					"Stage",
+					"TXD Archive",
+					"TXC Animations"
+			};
+			static int ui_select = 0;
+			ImGui::PushItemWidth(-1.0f);
+			ImGui::Combo("##uiselect", &ui_select, menus, 4);
+			ImGui::PopItemWidth();
+			ImGui::Separator();
 
-		if (txd)
-			txd->showWindow();
+			switch (ui_select) {
+				case 0: {
+					drawMainUI();
+				} break;
+				case 1: {
+					if (stage) {
+						stage->drawUI(campos);
+					} else {
+						ImGui::TextColored(ImVec4(1.0f, 0.25f, 0.0f, 1.0f), "No stage is loaded");
+					}
+				} break;
+				case 2: {
+					if (txd) {
+						txd->drawUI();
+					} else {
+						ImGui::TextColored(ImVec4(1.0f, 0.25f, 0.0f, 1.0f), "No TXD is loaded");
+					}
+				} break;
+				case 3: {
+					if (txc) {
+						txc->drawUI(txd);
+					} else {
+						ImGui::TextColored(ImVec4(1.0f, 0.25f, 0.0f, 1.0f), "No TXC is loaded");
+					}
+				} break;
+				default: {
+					ImGui::TextColored(ImVec4(1.0f, 0.25f, 0.0f, 1.0f), "Invalid menu selection");
+				}
+			}
+		}
+		ImGui::End();
+
+		if (showTestWindow) {
+			ImGui::ShowTestWindow(&showTestWindow);
+		}
 
 		if (txc) {
 			txc->setTime(mTime);
-			txc->showUI(txd);
 		}
 
-		if (stage)
+		if (stage) {
 			stage->draw(campos, txc);
+		}
 	}
 };
 

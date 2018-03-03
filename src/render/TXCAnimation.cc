@@ -108,9 +108,18 @@ bgfx::TextureHandle TXCAnimation::getTexture(bgfx::TextureHandle lookup) {
 	}
 }
 
-void TXCAnimation::showUI(TexDictionary* txd) {
-	ImGui::Begin("TXC Animation");
+static void hint(const char* desc) {
+	if (ImGui::IsItemHovered())
+	{
+		ImGui::BeginTooltip();
+		ImGui::PushTextWrapPos(450.0f);
+		ImGui::TextUnformatted(desc);
+		ImGui::PopTextWrapPos();
+		ImGui::EndTooltip();
+	}
+}
 
+void TXCAnimation::drawUI(TexDictionary* txd) {
 	bool mappingModified = false;
 
 	std::vector<const char*> items;
@@ -127,12 +136,14 @@ void TXCAnimation::showUI(TexDictionary* txd) {
 		listbox_sel = (unsigned) animations.size() - 1;
 		mappingModified = true;
 	}
+	hint("Adds a new animation");
 	ImGui::SameLine();
 	if (ImGui::Button("delete")) {
 		animations.erase(animations.begin() + listbox_sel);
 		if (listbox_sel >= animations.size()) listbox_sel--;
 		mappingModified = true;
 	}
+	hint("Deletes the selected animation");
 	ImGui::SameLine();
 	if (ImGui::Button("save all")) {
 		rc::util::FSPath outPath("out.txc");
@@ -172,6 +183,7 @@ void TXCAnimation::showUI(TexDictionary* txd) {
 		}
 		out.write((u32) 0xffffffff);
 	}
+	hint("Write animations to file");
 	ImGui::Separator();
 
 	if (listbox_sel >= 0 && listbox_sel < animations.size()) {
@@ -201,10 +213,12 @@ void TXCAnimation::showUI(TexDictionary* txd) {
 			snprintf(replaceTexture, 32, "%s.1", name);
 			deltasModified = true;
 		}
+		hint("Name is used to find the texture of each frame\ni.e. the first frame is <name>.1, second frame <name>.2");
 		if (ImGui::InputText("replaces", replaceTexture, 32)) {
 			animation.replaceTexture = std::string(replaceTexture);
 			mappingModified = true;
 		}
+		hint("This is the name of the texture in the stage that will be replaced with this animation");
 		ImGui::Separator();
 
 		// automatic frame generation
@@ -214,9 +228,15 @@ void TXCAnimation::showUI(TexDictionary* txd) {
 		static int generate_frame_duration = 2;
 		static bool generate_auto = false;
 		bool generate_dirty = false;
+		ImGui::Text("Automatic Frame Generation");
+		ImGui::PushItemWidth(-150.0f);
 		if (ImGui::DragInt("First Texture", &generate_begin_frame, 0.1f, 1, 99)) generate_dirty = true;
+		hint("Number of first texture in the animation (usually 1)");
 		if (ImGui::DragInt("Last Texture", &generate_end_frame, 0.1f, 1, 99)) generate_dirty = true;
+		hint("Number of last texture in the animation (e.g. 20 if you have 20 frames)");
 		if (ImGui::DragInt("Frame Duration", &generate_frame_duration, 0.1f, 1, 99)) generate_dirty = true;
+		hint("How many in-game frames to display a frame of the animation for\n'In-game frames' are measured at 60fps");
+		ImGui::PopItemWidth();
 		if (ImGui::Button("Generate") || generate_auto) {
 			auto& frameDeltas = animation.frameDeltas;
 			frameDeltas.clear();
@@ -229,11 +249,14 @@ void TXCAnimation::showUI(TexDictionary* txd) {
 			} while ((generate_begin_frame < generate_end_frame ? i++ : i--) != generate_end_frame);
 			deltasModified = true;
 		}
+		hint("Pressing this button will wipe all frames below and automatically generate new ones based on the above parameters");
 		ImGui::SameLine();
 		ImGui::Checkbox("generate automatically", &generate_auto);
+		hint("If this is enabled, frames below will automatically be wiped and regenerated each time a change is detected to the parameters");
 		ImGui::Separator();
 
 		// manual frame editing
+		ImGui::Text("Manual Frame Editing");
 		ImGui::Columns(3);
 		ImGui::TextUnformatted("Texture");
 		ImGui::NextColumn();
@@ -254,11 +277,13 @@ void TXCAnimation::showUI(TexDictionary* txd) {
 				frame.textureID = (u16) textureID;
 				deltasModified = true;
 			}
+			hint("Index of texture to use for this frame (number after the dot)");
 			ImGui::NextColumn();
 			if (ImGui::DragInt("##duration", &duration, 0.1f, 0, animation.frameCount)) {
 				frame.duration = (u16) duration;
 				deltasModified = true;
 			}
+			hint("How many frames to show this texture for (measured in frames at 60fps)");
 			ImGui::NextColumn();
 			if (ImGui::Button("...")) {
 				ImGui::OpenPopup("Actions");
@@ -268,26 +293,31 @@ void TXCAnimation::showUI(TexDictionary* txd) {
 					action = 1;
 					action_self = i;
 				}
+				hint("Insert a new entry before this one");
 				if (ImGui::MenuItem("Insert After")) {
 					action = 1;
 					action_self = i + 1;
 				}
+				hint("Insert a new entry after this one");
 				ImGui::Separator();
 				if (ImGui::MenuItem("Move Up", nullptr, false, i > 0)) {
 					action = 2;
 					action_self = i;
 					action_other = i - 1;
 				}
+				hint("Move this entry up one place");
 				if (ImGui::MenuItem("Move Down", nullptr, false, i < frameDeltas.size() - 1)) {
 					action = 2;
 					action_self = i;
 					action_other = i + 1;
 				}
+				hint("Move this entry down one place");
 				ImGui::Separator();
 				if (ImGui::MenuItem("Delete")) {
 					action = 3;
 					action_self = i;
 				}
+				hint("Delete this entry");
 				ImGui::EndPopup();
 			}
 			ImGui::NextColumn();
@@ -322,8 +352,6 @@ void TXCAnimation::showUI(TexDictionary* txd) {
 	if (mappingModified) {
 		recalcMapping(txd);
 	}
-
-	ImGui::End();
 }
 
 bgfx::TextureHandle TXCAnimation::getTextureNumbered(TexDictionary* txd, TXCAnimation::AnimatedTexture& anim, int number) {

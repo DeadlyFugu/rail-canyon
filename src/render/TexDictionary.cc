@@ -57,10 +57,7 @@ bgfx::TextureHandle TexDictionary::getTexture(const char* name) {
 	return bgfx::TextureHandle();
 }
 
-void TexDictionary::showWindow() {
-	ImGui::Begin("TXD Archive");
-
-	//const char* listbox_items[] = { "Apple", "Banana", "Cherry", "Kiwi", "Mango", "Orange", "Pineapple", "Strawberry", "Watermelon" };
+void TexDictionary::drawUI() {
 	std::vector<const char*> listbox_items;
 	for (auto& tex : textures) {
 		listbox_items.push_back(tex.textureChunk->name.c_str());
@@ -76,5 +73,4 @@ void TexDictionary::showWindow() {
 	img.s.handle = current.handle;
 	ImGui::Image(img.ptr, ImVec2(current.textureChunk->width, current.textureChunk->height));
 	ImGui::LabelText("handle", "%d", current.handle.idx);
-	ImGui::End();
 }

@@ -35,4 +35,5 @@ public:
 	void fromArchive(ONEArchive* x, TexDictionary* txd);
 	void readVisibility(rc::util::FSPath& blkFile);
 	void draw(glm::vec3 camPos, TXCAnimation* txc);
+	void drawUI(glm::vec3 camPos);
 };

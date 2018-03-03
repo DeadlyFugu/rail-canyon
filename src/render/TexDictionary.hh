@@ -19,5 +19,5 @@ public:
 
 	bgfx::TextureHandle getTexture(const char* name);
 
-	void showWindow();
+	void drawUI();
 };

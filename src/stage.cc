@@ -34,8 +34,9 @@ void Stage::draw(glm::vec3 camPos, TXCAnimation* txc) {
 			model.draw(txc);
 		}
 	}
+}
 
-	ImGui::Begin("Stage");
+void Stage::drawUI(glm::vec3 camPos) {
 	ImGui::Checkbox("Force Show All", &visibilityManager.forceShowAll);
 	if (ImGui::CollapsingHeader("Visibility List")) {
 		for (auto& model : models) {
@@ -53,7 +54,6 @@ void Stage::draw(glm::vec3 camPos, TXCAnimation* txc) {
 			ImGui::PopID();
 		}
 	}
-	ImGui::End();
 }
 
 bool VisibilityManager::isVisible(int chunkId, glm::vec3 camPos) {
