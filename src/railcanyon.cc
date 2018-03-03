@@ -312,7 +312,7 @@ private:
 		camera.use(0, (float) getWidth() / getHeight());
 		bgfx::setViewRect( 0, 0, 0, uint16_t( getWidth() ), uint16_t( getHeight() ) );
 		bgfx::touch( 0 );
-		ImGui::Begin("RailCanyon v0.1");
+		ImGui::Begin("RailCanyon v0.2 [pre-release]");
 
 		static bool dvdrootExistsDirty = true;
 		static bool dvdrootExists = false;
@@ -381,8 +381,10 @@ private:
 		if (txd)
 			txd->showWindow();
 
-		if (txc)
+		if (txc) {
 			txc->setTime(mTime);
+			txc->showUI(txd);
+		}
 
 		if (stage)
 			stage->draw(campos, txc);

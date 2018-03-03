@@ -66,7 +66,8 @@ void TexDictionary::showWindow() {
 		listbox_items.push_back(tex.textureChunk->name.c_str());
 	}
 
-	ImGui::ListBox("listbox\n(single select)", &listbox_item_current, &listbox_items[0], listbox_items.size(), 4);
+	static int listbox_item_current = 0;
+	ImGui::ListBox("listbox\n(single select)", &listbox_item_current, &listbox_items[0], listbox_items.size(), 6);
 
 	auto& current = textures[listbox_item_current];
 	union BiggImTexture { ImTextureID ptr; struct { uint16_t flags; bgfx::TextureHandle handle; } s; };
