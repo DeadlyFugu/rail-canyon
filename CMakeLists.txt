@@ -8,6 +8,7 @@ else()
 endif()
 
 set(BIGG_EXAMPLES OFF CACHE BOOL "Build examples.")
+add_definitions(-DBGFX_CONFIG_MAX_COMMAND_BUFFER_SIZE=1048576)
 add_subdirectory( extern/bigg )
 add_subdirectory( extern/rwstreamlib )
 

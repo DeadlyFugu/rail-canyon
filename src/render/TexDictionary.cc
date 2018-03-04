@@ -6,16 +6,19 @@ TexDictionary::TexDictionary(rw::TextureDictionary* txdChunk) {
 		if (texture->compression) {
 			switch (texture->compression) {
 				case 1: format = bgfx::TextureFormat::BC1; break; // DXT1
-				default: log_warn("Compression type %d unsupported", texture->compression);
+				default: rw::util::logger.warn("Compression type %d unsupported", texture->compression);
 			}
 		} else {
 			switch (texture->format & 0x0f00) {
 				case rw::TextureRasterFormat::RASTER_C8888:
 					format = bgfx::TextureFormat::BGRA8;
 					break;
+				case rw::TextureRasterFormat::RASTER_C888:
+					format = bgfx::TextureFormat::BGRA8;
+					break;
 				default: {
 					char* buffer = rw::getRasterFormatLabel(texture->format);
-					log_warn("Texture format %s unsupported", buffer);
+					rw::util::logger.warn("Texture format %s unsupported", buffer);
 					delete[] buffer;
 				}
 			}
@@ -33,9 +36,20 @@ TexDictionary::TexDictionary(rw::TextureDictionary* txdChunk) {
 		u16 height = texture->height;
 
 		auto bgfxTexHandle = bgfx::createTexture2D(
-				width, height, false, 1, format, 0,
-				bgfx::makeRef(texture->data, texture->dataSize)
+				width, height, /*(bool) (texture->format & rw::RASTER_MIPMAP) && !(texture->format & rw::RASTER_AUTOMIPMAP)*/ texture->mipmaps.size() > 1, 1, format, 0,
+				nullptr //bgfx::makeRef(texture->mipmaps[0].data, texture->mipmaps[0].size)
 		);
+
+		u8 mip = 0;
+		for (auto& mipmap : texture->mipmaps) {
+			bgfx::updateTexture2D(bgfxTexHandle, 0, mip, 0, 0, width, height,
+								  bgfx::makeRef(texture->mipmaps[mip].data, texture->mipmaps[mip].size));
+
+			mip++;
+			width >>= 1;
+			height >>= 1;
+		}
+
 		TextureEntry e; // todo: make constructor and use emplace_back
 		e.handle = bgfxTexHandle;
 		e.textureChunk = texture;
