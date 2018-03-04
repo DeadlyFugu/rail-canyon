@@ -212,7 +212,8 @@ void BSPModel::draw(TXCAnimation* txc) {
 				uint64_t state = BGFX_STATE_RGB_WRITE;
 				state |= BGFX_STATE_ALPHA_WRITE;
 
-				state |= BGFX_STATE_DEPTH_WRITE;
+				if (!((renderBits & BIT_ADDITIVE) || (renderBits & BIT_FULL_ALPHA)))
+					state |= BGFX_STATE_DEPTH_WRITE;
 				state |= BGFX_STATE_DEPTH_TEST_LESS;
 
 				state |= BGFX_STATE_PT_TRISTRIP;
