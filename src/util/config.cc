@@ -44,7 +44,12 @@ static void config_load() {
 			while (*keyEnd == ' ' || *keyEnd == '\t') keyEnd--;
 			keyEnd++;
 
-			entry.key = std::string(lineBegin, keyEnd - lineBegin);
+			// put key
+			if (keyEnd - lineBegin <= 0) {
+				entry.key = "";
+			} else {
+				entry.key = std::string(lineBegin, keyEnd - lineBegin);
+			}
 
 			// read value
 			colonPoint++;
@@ -53,7 +58,12 @@ static void config_load() {
 			while (*lineEnd == ' ' || *lineEnd == '\t') lineEnd--;
 			lineEnd++;
 
-			entry.value = std::string(colonPoint, lineEnd - colonPoint);
+			// put value
+			if (lineEnd - colonPoint <= 0) {
+				entry.value = "";
+			} else {
+				entry.value = std::string(colonPoint, lineEnd - colonPoint);
+			}
 
 			log_info("READ '%s': '%s'", entry.key.c_str(), entry.value.c_str());
 		}

@@ -119,6 +119,9 @@ static void hint(const char* desc) {
 	}
 }
 
+const char* getOutPath();
+const char* getStageFilename();
+
 void TXCAnimation::drawUI(TexDictionary* txd) {
 	bool mappingModified = false;
 
@@ -146,7 +149,10 @@ void TXCAnimation::drawUI(TexDictionary* txd) {
 	hint("Deletes the selected animation");
 	ImGui::SameLine();
 	if (ImGui::Button("save all")) {
-		rc::util::FSPath outPath("out.txc");
+		rc::util::FSPath outDVDRoot(getOutPath());
+		char filename[32];
+		snprintf(filename, 32, "%s.txc", getStageFilename());
+		rc::util::FSPath outPath = outDVDRoot / filename;
 		rc::util::FSFile out(outPath);
 
 		for (auto& animation : animations) {

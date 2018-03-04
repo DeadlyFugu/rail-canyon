@@ -21,6 +21,7 @@ class VisibilityManager {
 		i32 high_z;
 	};
 	std::vector<VisibilityBlock> blocks;
+	bool fileExists = false;
 public:
 	bool forceShowAll = false;
 	bool isVisible(int chunkId, glm::vec3 camPos);

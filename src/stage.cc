@@ -58,6 +58,8 @@ void Stage::drawUI(glm::vec3 camPos) {
 
 bool VisibilityManager::isVisible(int chunkId, glm::vec3 camPos) {
 	if (forceShowAll) return true;
+	if (!chunkId) return true;
+	if (!fileExists) return true;
 
 	i32 x = (i32) camPos.x;
 	i32 y = (i32) camPos.y;
@@ -89,6 +91,7 @@ static void swapEndianness(u32* value) {
 
 void VisibilityManager::read(rc::util::FSPath& blkFile) {
 	rc::util::FSFile f(blkFile);
+	fileExists = true;
 
 	for (int i = 0; i < 64; i++) {
 		if (f.atEnd()) {

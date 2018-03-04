@@ -153,6 +153,18 @@ void recordStreamErrorLog(rw::util::Logger::LogLevel level, const char* str) {
 
 static auto cameraStartPos = glm::vec3(0.0f, 10.0f, 35.0f );
 
+static int stageSelect = 0;
+static char dvdroot[512] = "D:\\Heroes\\dvdroot\0";
+static char dvdroot_out[512] = "";
+
+const char* getOutPath() {
+	return dvdroot_out[0] ? dvdroot_out : ".";
+}
+
+const char* getStageFilename() {
+	return stageFileNames[stageSelect];
+}
+
 class RailCanyonApp : public bigg::Application {
 private:
 	Camera camera;
@@ -161,8 +173,6 @@ private:
 	TexDictionary* txd = nullptr;
 	TXCAnimation* txc = nullptr;
 
-	int stageSelect = 0;
-	char dvdroot[512] = "D:\\Heroes\\dvdroot\0";
 	bool showTestWindow = false;
 public:
 	RailCanyonApp() : camera(glm::vec3(0.f, 100.f, 350.f), glm::vec3(0,0,0), 60, 1.f, 960000.f) {}
@@ -182,7 +192,8 @@ private:
 		rc::io::ONEArchive archive(onePath);
 		stage = new Stage();
 		stage->fromArchive(&archive, txd);
-		stage->readVisibility(blkPath);
+		if (blkPath.exists())
+			stage->readVisibility(blkPath);
 	}
 
 	void openStage(const char* name) {
@@ -200,8 +211,6 @@ private:
 			rw::util::logger.error("missing .txd");
 		} else if (!onePath.exists()) {
 			rw::util::logger.error("missing .one");
-		} else if (!blkPath.exists()) {
-			rw::util::logger.error("missing _blk.bin");
 		} else {
 			openTXD(txdPath);
 			openBSPWorld(onePath, blkPath);
@@ -231,6 +240,8 @@ private:
 		// read config
 		const char* dvdroot_ = config_get("dvdroot", dvdroot);
 		strncpy(dvdroot, dvdroot_, 512);
+		const char* dvdroot_out_ = config_get("dvdroot_out", dvdroot_out);
+		strncpy(dvdroot_out, dvdroot_out_, 512);
 
 		// setup bgfx
 		bgfx::setDebug( BGFX_DEBUG_TEXT );
@@ -251,6 +262,7 @@ private:
 	void drawMainUI() {
 		ImGui::Text("RailCanyon v0.2 [pre-release]");
 
+		// dvdroot
 		static bool dvdrootExistsDirty = true;
 		static bool dvdrootExists = false;
 		if (ImGui::InputText("dvdroot", dvdroot, 512)) {
@@ -266,6 +278,26 @@ private:
 			dvdrootExistsDirty = false;
 		}
 		if (!dvdrootExists) {
+			ImGui::TextColored(ImVec4(1.0f, 0.25f, 0.0f, 1.0f), "Path does not exist");
+		}
+
+		// dvdroot out
+		// todo: somehow merge this with above
+		static bool dvdrootOutExistsDirty = true;
+		static bool dvdrootOutExists = false;
+		if (ImGui::InputText("dvdroot out", dvdroot_out, 512)) {
+			dvdrootOutExistsDirty = true;
+		}
+		if (dvdrootOutExistsDirty) {
+			rc::util::FSPath dvdrootOutPath(dvdroot_out);
+			dvdrootOutExists = dvdrootOutPath.exists() || !dvdroot_out[0]; // if empty string, also counts as exists
+
+			if (dvdrootOutExists) {
+				config_set("dvdroot_out", dvdroot_out);
+			}
+			dvdrootOutExistsDirty = false;
+		}
+		if (!dvdrootOutExists) {
 			ImGui::TextColored(ImVec4(1.0f, 0.25f, 0.0f, 1.0f), "Path does not exist");
 		}
 
@@ -311,27 +343,26 @@ private:
 
 	void update( float dt ) override {
 		mTime += dt;
-//		glm::mat4 view = glm::lookAt(eye, glm::vec3(0.0f, 0.0f, 0.0f ), glm::vec3(0.0f, 1.0f, 0.0f ) );
-//		glm::mat4 proj = bigg::perspective( glm::radians( 60.0f ), float( getWidth() ) / getHeight(), 0.1f, 16000.0f );
-//		bgfx::setViewTransform( 0, &view[0][0], &proj[0][0] );
-		glm::vec3 inputMove(0,0,0);
-		if (glfwGetKey(this->mWindow, GLFW_KEY_W))
-			inputMove.z += 1;
-		if (glfwGetKey(this->mWindow, GLFW_KEY_S))
-			inputMove.z -= 1;
-		if (glfwGetKey(this->mWindow, GLFW_KEY_D))
-			inputMove.x += 1;
-		if (glfwGetKey(this->mWindow, GLFW_KEY_A))
-			inputMove.x -= 1;
-		if (glfwGetKey(this->mWindow, GLFW_KEY_Q))
-			inputMove.y -= 1;
-		if (glfwGetKey(this->mWindow, GLFW_KEY_E))
-			inputMove.y += 1;
-		if (glfwGetKey(this->mWindow, GLFW_KEY_LEFT_SHIFT) || glfwGetKey(this->mWindow, GLFW_KEY_RIGHT_SHIFT))
-			inputMove *= 2.5f;
-		if (glfwGetKey(this->mWindow, GLFW_KEY_LEFT_ALT) || glfwGetKey(this->mWindow, GLFW_KEY_RIGHT_ALT))
-			inputMove *= 10.f;
-		camera.inputMoveAxis(inputMove, dt);
+		if (!ImGui::GetIO().WantCaptureKeyboard) {
+			glm::vec3 inputMove(0, 0, 0);
+			if (glfwGetKey(this->mWindow, GLFW_KEY_W))
+				inputMove.z += 1;
+			if (glfwGetKey(this->mWindow, GLFW_KEY_S))
+				inputMove.z -= 1;
+			if (glfwGetKey(this->mWindow, GLFW_KEY_D))
+				inputMove.x += 1;
+			if (glfwGetKey(this->mWindow, GLFW_KEY_A))
+				inputMove.x -= 1;
+			if (glfwGetKey(this->mWindow, GLFW_KEY_Q))
+				inputMove.y -= 1;
+			if (glfwGetKey(this->mWindow, GLFW_KEY_E))
+				inputMove.y += 1;
+			if (glfwGetKey(this->mWindow, GLFW_KEY_LEFT_SHIFT) || glfwGetKey(this->mWindow, GLFW_KEY_RIGHT_SHIFT))
+				inputMove *= 2.5f;
+			if (glfwGetKey(this->mWindow, GLFW_KEY_LEFT_ALT) || glfwGetKey(this->mWindow, GLFW_KEY_RIGHT_ALT))
+				inputMove *= 10.f;
+			camera.inputMoveAxis(inputMove, dt);
+		}
 
 		glm::vec2 inputLook(0,0);
 		static bool mouseIsDragging;
@@ -357,7 +388,7 @@ private:
 				glfwSetCursorPos(this->mWindow, this->getWidth() / 2.0, this->getHeight() / 2.0);
 				glfwGetCursorPos(this->mWindow, &mouseLastX, &mouseLastY);
 			}
-		} else {
+		} else if (!ImGui::GetIO().WantCaptureKeyboard) {
 			if (glfwGetKey(this->mWindow, GLFW_KEY_UP))
 				inputLook.y += 1;
 			if (glfwGetKey(this->mWindow, GLFW_KEY_DOWN))
@@ -374,7 +405,7 @@ private:
 		camera.inputLookAxis(inputLook, dt);
 
 
-		if (glfwGetKey(this->mWindow, GLFW_KEY_SPACE))
+		if (!ImGui::GetIO().WantCaptureKeyboard && glfwGetKey(this->mWindow, GLFW_KEY_SPACE))
 			camera.lookAt(vec3(0,0,0));
 		//camera.setPosition(eye);
 		//camera.lookAt(glm::vec3(0,0,0));

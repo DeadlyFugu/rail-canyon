@@ -57,7 +57,7 @@ void Camera::inputMoveAxis(vec3 axis, float dt) {
 	if (axis.x != 0 || axis.y != 0 || axis.z != 0) {
 		axis *= moveSensitivity * (dt / 0.01667f);
 		vec3 D = dir;
-		vec3 R = cross(D, U);
+		vec3 R = normalize(cross(D, U));
 		pos += R * axis.x + D * axis.z + U * axis.y;
 		matViewDirty = true;
 	}
