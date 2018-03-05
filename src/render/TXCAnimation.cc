@@ -31,6 +31,7 @@ TXCAnimation::TXCAnimation(Buffer& data, TexDictionary* txd) {
 
 		int previousFrameID = 0;
 		u16 bonusFinalDuration = 0; // counteract odd 'offset by 1' animations
+		int previousDuration = -1;
 		auto& frameDatas = animation.frameDeltas;
 		while (true) {
 			// read frame
@@ -57,17 +58,36 @@ TXCAnimation::TXCAnimation(Buffer& data, TexDictionary* txd) {
 			FrameDeltaData delta;
 			delta.textureID = frame.textureID;
 			delta.duration = 0; // edited by below section on next iteration
+			delta.error = getTextureNumbered(txd, animation, delta.textureID).idx == 0; // test if texture in txd
 			frameDatas.push_back(delta);
 
 			// set previous delta's duration
 			if (frameDatas.size() > 1) {
-				frameDatas[frameDatas.size() - 2].duration = (u16) (frame.frameID - previousFrameID);
+				u16 duration = (u16) (frame.frameID - previousFrameID);
+				frameDatas[frameDatas.size() - 2].duration = duration;
+
+				// calculate generator duration
+				if (frame.frameID - previousFrameID == previousDuration)
+					animation.generate_frame_duration = duration;
+				previousDuration = duration;
 			}
+
+			// calculate generator end frame
+			if (frame.textureID > animation.generate_end_texture)
+				animation.generate_end_texture = frame.textureID;
+
+			// set previousFrameID for next iteration
 			previousFrameID = frame.frameID;
 		}
 
+		// set final duration
 		if (frameDatas.size() > 0) {
 			frameDatas[frameDatas.size() - 1].duration = (u16) (animation.frameCount - previousFrameID) + bonusFinalDuration;
+
+			// calculate generate duration if not enough frames for normal method to work (needs at least 3)
+			if (frameDatas.size() <= 2) {
+				animation.generate_frame_duration = frameDatas[0].duration;
+			}
 		}
 
 		uint16_t lastIndex = replaceIdx;
@@ -95,15 +115,8 @@ bgfx::TextureHandle TXCAnimation::getTexture(bgfx::TextureHandle lookup) {
 		return lookup;
 	} else {
 		auto& animation = animations[result->second];
-		auto totalFrames = animation.frameCount;
-		auto duration = totalFrames / FPS;
-		auto animTime = fmodf(time, duration);
-		auto animFrame = (int) (animTime * FPS);
-
-		if (animFrame < 0) animFrame = 0;
-		if (animFrame >= totalFrames) animFrame = totalFrames - 1;
-
-		if (totalFrames == 0) return {0};
+		int animFrame = getCurrentFrameOffset(animation);
+		if (animFrame == -1) return {0};
 		else return animation.frames[animFrame];
 	}
 }
@@ -228,36 +241,32 @@ void TXCAnimation::drawUI(TexDictionary* txd) {
 		ImGui::Separator();
 
 		// automatic frame generation
-		// todo: below static values should be fields and auto determined on file load
-		static int generate_begin_frame = 1;
-		static int generate_end_frame = 1;
-		static int generate_frame_duration = 2;
-		static bool generate_auto = false;
 		bool generate_dirty = false;
 		ImGui::Text("Automatic Frame Generation");
 		ImGui::PushItemWidth(-150.0f);
-		if (ImGui::DragInt("First Texture", &generate_begin_frame, 0.1f, 1, 99)) generate_dirty = true;
+		if (ImGui::DragInt("First Texture", &animation.generate_begin_texture, 0.1f, 1, 99)) generate_dirty = true;
 		hint("Number of first texture in the animation (usually 1)");
-		if (ImGui::DragInt("Last Texture", &generate_end_frame, 0.1f, 1, 99)) generate_dirty = true;
+		if (ImGui::DragInt("Last Texture", &animation.generate_end_texture, 0.1f, 1, 99)) generate_dirty = true;
 		hint("Number of last texture in the animation (e.g. 20 if you have 20 frames)");
-		if (ImGui::DragInt("Frame Duration", &generate_frame_duration, 0.1f, 1, 99)) generate_dirty = true;
+		if (ImGui::DragInt("Frame Duration", &animation.generate_frame_duration, 0.1f, 1, 99)) generate_dirty = true;
 		hint("How many in-game frames to display a frame of the animation for\n'In-game frames' are measured at 60fps");
 		ImGui::PopItemWidth();
-		if (ImGui::Button("Generate") || generate_auto) {
+		if (ImGui::Button("Generate") || animation.generate_auto) {
 			auto& frameDeltas = animation.frameDeltas;
 			frameDeltas.clear();
-			int i = generate_begin_frame;
+			int i = animation.generate_begin_texture;
 			do {
 				FrameDeltaData delta;
-				delta.duration = (u16) generate_frame_duration;
+				delta.duration = (u16) animation.generate_frame_duration;
 				delta.textureID = (u16) i;
+				delta.error = getTextureNumbered(txd, animation, delta.textureID).idx == 0; // test if texture in txd
 				frameDeltas.push_back(delta);
-			} while ((generate_begin_frame < generate_end_frame ? i++ : i--) != generate_end_frame);
+			} while ((animation.generate_begin_texture < animation.generate_end_texture ? i++ : i--) != animation.generate_end_texture);
 			deltasModified = true;
 		}
 		hint("Pressing this button will wipe all frames below and automatically generate new ones based on the above parameters");
 		ImGui::SameLine();
-		ImGui::Checkbox("generate automatically", &generate_auto);
+		ImGui::Checkbox("generate automatically", &animation.generate_auto);
 		hint("If this is enabled, frames below will automatically be wiped and regenerated each time a change is detected to the parameters");
 		ImGui::Separator();
 
@@ -275,21 +284,40 @@ void TXCAnimation::drawUI(TexDictionary* txd) {
 		unsigned action_self = 0; // index of action
 		unsigned action_other = 0; // index of other (for swap only)
 		auto& frameDeltas = animation.frameDeltas;
+		int animFrame = getCurrentFrameOffset(animation);
+		int currentOffs = 0;
 		for (auto& frame : frameDeltas) {
 			int duration = frame.duration;
 			int textureID = frame.textureID;
 			ImGui::PushID(i);
+			bool isFrameActive = animFrame >= currentOffs && animFrame < currentOffs + duration;
+			currentOffs += duration;
+			bool isFrameError = frame.error;
+			if (isFrameActive) ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.0f, 0.75f, 1.0f, 1.0f));
+			if (isFrameError) {
+				ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(1.0f, 0.12f, 0.0f, 0.75f));
+				ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, ImVec4(1.0f, 0.24f, 0.0f, 0.87f));
+				ImGui::PushStyleColor(ImGuiCol_FrameBgActive, ImVec4(1.0f, 0.24f, 0.0f, 0.87f));
+			}
 			if (ImGui::DragInt("##texture", &textureID, 0.1f, 0, 99)) {
 				frame.textureID = (u16) textureID;
 				deltasModified = true;
 			}
-			hint("Index of texture to use for this frame (number after the dot)");
+			if (isFrameError) ImGui::PopStyleColor(3);
+			if (isFrameActive) ImGui::PopStyleColor(1);
+			if (isFrameError)
+				hint("Index of texture to use for this frame (number after the dot)\n"
+				"That texture could not be found in the TXD");
+			else
+				hint("Index of texture to use for this frame (number after the dot)");
+			if (isFrameActive) ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.0f, 0.75f, 1.0f, 1.0f));
 			ImGui::NextColumn();
 			if (ImGui::DragInt("##duration", &duration, 0.1f, 0, animation.frameCount)) {
 				frame.duration = (u16) duration;
 				deltasModified = true;
 			}
 			hint("How many frames to show this texture for (measured in frames at 60fps)");
+			if (isFrameActive) ImGui::PopStyleColor(1);
 			ImGui::NextColumn();
 			if (ImGui::Button("...")) {
 				ImGui::OpenPopup("Actions");
@@ -339,6 +367,7 @@ void TXCAnimation::drawUI(TexDictionary* txd) {
 				FrameDeltaData delta;
 				delta.duration = 1;
 				delta.textureID = 1;
+				delta.error = getTextureNumbered(txd, animation, delta.textureID).idx == 0; // test if texture in txd
 				frameDeltas.insert(frameDeltas.begin() + action_self, delta);
 			} else if (action == 2) { // swap
 				log_debug("swap");
@@ -384,6 +413,8 @@ void TXCAnimation::recalcFrames(TXCAnimation::AnimatedTexture& animation, TexDic
 		for (int j = 0; j < delta.duration; j++) {
 			frames[i++] = getTextureNumbered(txd, animation, delta.textureID);
 		}
+		// check errors
+		delta.error = getTextureNumbered(txd, animation, delta.textureID).idx == 0; // test if texture in txd
 	}
 	// shrink if necessary
 	if (i != frames.size()) {
@@ -402,4 +433,17 @@ void TXCAnimation::recalcMapping(TexDictionary* txd) {
 		textureLookup.insert(std::make_pair(replaceIdx, i));
 		i++;
 	}
+}
+
+int TXCAnimation::getCurrentFrameOffset(TXCAnimation::AnimatedTexture& animation) {
+	auto totalFrames = animation.frameCount;
+	auto duration = totalFrames / FPS;
+	auto animTime = fmodf(time, duration);
+	auto animFrame = (int) (animTime * FPS);
+
+	if (animFrame < 0) animFrame = 0;
+	if (animFrame >= totalFrames) animFrame = totalFrames - 1;
+
+	if (totalFrames == 0) return -1;
+	return animFrame;
 }
