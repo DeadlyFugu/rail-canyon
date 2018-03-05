@@ -3,7 +3,6 @@
 
 #pragma once
 #include "util/fspath.hh"
-#include "util/fsfile.hh"
 
 #include <vector>
 
@@ -12,7 +11,7 @@ namespace io {
 
 class ONEArchive {
 private:
-	util::FSFile f;
+	Buffer f;
 	std::string name;
 
 	struct FileEntry {

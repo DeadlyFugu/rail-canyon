@@ -3,6 +3,8 @@
 
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <stdio.h>
+#include <stdlib.h>
 
 namespace rc {
 namespace util {
@@ -122,6 +124,42 @@ bool FSPath::mkDir() {
 #else
 bool FSPath::mkDir() {
 	return mkdir(str.c_str(), 0700) == 0;
+}
+
+Buffer FSPath::read() {
+	FILE* f = fopen(str.c_str(), "rb");
+	if (!f) {
+		logger.error("Could not open file %s for reading", str.c_str());
+		return Buffer(0);
+	}
+	fseek(f, 0, SEEK_END);
+	auto len = ftell(f);
+	auto data = malloc(len);
+	if (!data) {
+		logger.error("Failed to allocate memory for file %s", str.c_str());
+		return Buffer(0);
+	}
+	fseek(f, 0, SEEK_SET);
+	auto read = fread(data, len, 1, f);
+	if (!read) {
+		logger.error("Failed to read file %s", str.c_str());
+		return Buffer(0);
+	}
+	return Buffer(data, len, true);
+}
+
+bool FSPath::write(Buffer& data) {
+	FILE* f = fopen(str.c_str(), "wb");
+	if (!f) {
+		logger.error("Could not open file %s for reading", str.c_str());
+		return false;
+	}
+	int wrote = fwrite(data.base_ptr(), data.size(), 1, f);
+	if (!wrote) {
+		logger.error("Failed to write file %s", str.c_str());
+		return false;
+	}
+	fclose(f);
 }
 
 #endif

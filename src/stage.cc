@@ -1,5 +1,6 @@
 #include "common.hh"
 #include "stage.hh"
+#include <../extern/bigg/deps/bgfx.cmake/bgfx/examples/common/debugdraw/debugdraw.h>
 
 Stage::~Stage() {
 	models.clear();
@@ -50,6 +51,10 @@ void Stage::drawVisibilityUI(glm::vec3 camPos) {
 	visibilityManager.drawUI(camPos);
 }
 
+void Stage::drawDebug(glm::vec3 camPos) {
+	visibilityManager.drawDebug(camPos);
+}
+
 bool VisibilityManager::isVisible(int chunkId, glm::vec3 camPos) {
 	if (forceShowAll) return true;
 	if (!chunkId) return true;
@@ -79,9 +84,7 @@ static void swapEndianness(u32* value) {
 }
 
 void VisibilityManager::read(rc::util::FSPath& blkFile) {
-	rc::util::FSFile f_(blkFile);
-	rc::util::Buffer b_ = f_.toBuffer();
-	rw::util::Buffer b(b_.base_ptr(), b_.size(), false);
+	Buffer b = blkFile.read();
 	fileExists = true;
 
 	for (int i = 0; i < 64; i++) {
@@ -113,12 +116,14 @@ void VisibilityManager::read(rc::util::FSPath& blkFile) {
 
 void VisibilityManager::drawUI(glm::vec3 camPos) {
 	ImGui::Checkbox("Force Show All", &forceShowAll);
+	ImGui::Checkbox("Show Chunk Borders", &showChunkBorders);
+	if (showChunkBorders) ImGui::Checkbox("Pad Chunk Borders", &usePadding);
 	int blockIdx = 1;
 	for (auto& block : blocks) {
 		ImGui::Separator();
 
 		ImGui::PushID(blockIdx);
-		if (block.contains(camPos)) ImGui::TextColored(ImVec4(0.0f, 0.75f, 1.0f, 1.0f), "Visibility Block %d", ++blockIdx);
+		if (block.contains(camPos)) ImGui::TextColored(ImVec4(0.0f, 0.75f, 1.0f, 1.0f), "Visibility Block %d", blockIdx);
 		else ImGui::Text("Visibility Block %d", blockIdx);
 		if (block.chunk == -1) {
 			if (ImGui::Button("Create")) block.chunk = 1;
@@ -129,5 +134,29 @@ void VisibilityManager::drawUI(glm::vec3 camPos) {
 		}
 		ImGui::PopID();
 		blockIdx++;
+	}
+}
+
+void VisibilityManager::drawDebug(glm::vec3 camPos) {
+	if (showChunkBorders) {
+		for (auto& block : blocks) {
+			ddPush();
+			ddSetWireframe(true);
+			float borderOffs = 0;
+			if (block.contains(camPos)) {
+				ddSetColor(0xffff8800);
+				ddSetState(false, false, true);
+			} else {
+				ddSetColor(0x88888888);
+				ddSetStipple(true, 0.001f);
+				if (usePadding) borderOffs = 100.f;
+			}
+			Aabb box = {
+					{block.low_x + borderOffs, block.low_y + borderOffs,  block.low_z + borderOffs},
+					{block.high_x - borderOffs, block.high_y - borderOffs, block.high_z - borderOffs}
+			};
+			ddDraw(box);
+			ddPop();
+		}
 	}
 }

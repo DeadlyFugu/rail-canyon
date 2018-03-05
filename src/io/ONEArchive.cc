@@ -18,10 +18,8 @@ static const int ONE_HeroesPreE3Magic = 0x1003FFFF;
 static const int ONE_Shadow060Magic = 0x1C020037;
 static const int ONE_Shadow050Magic = 0x1C020020;
 
-ONEArchive::ONEArchive(FSPath& path) : f(path), name(path.fileName()) {
-	if (!f.opened()) {
-		log_error("could not open .one archive %s", path.str.c_str());
-	} else {
+ONEArchive::ONEArchive(FSPath& path) : f(path.read()), name(path.fileName()) {
+	if (f.size()) {
 		f.seek(4);
 
 		u32 filesize;

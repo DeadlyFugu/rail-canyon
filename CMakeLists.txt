@@ -14,13 +14,13 @@ add_subdirectory( extern/rwstreamlib )
 
 set(RAILCANYON_CC
 		# util
-		src/util/buffer.cc
 		src/util/whereami.c
-		src/util/fsfile.cc
 		src/util/fspath.cc
 		src/util/log.cc
 		src/util/prs.cc
 		src/util/config.cc
+		extern/bigg/deps/bgfx.cmake/bgfx/examples/common/debugdraw/debugdraw.cpp
+		extern/bigg/deps/bgfx.cmake/bgfx/examples/common/bounds.cpp
 
 		# io
 		src/io/ONEArchive.cc
@@ -37,9 +37,7 @@ set(RAILCANYON_CC
 )
 set(RAILCANYON_HH
 		# util
-		src/util/buffer.hh
 		src/util/whereami.h
-		src/util/fsfile.hh
 		src/util/fspath.hh
 		src/util/log.hh
 		src/util/prs.hh

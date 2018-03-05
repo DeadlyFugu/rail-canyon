@@ -3,6 +3,7 @@
 
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtx/euler_angles.hpp>
+#include <../extern/bigg/deps/bgfx.cmake/bgfx/examples/common/debugdraw/debugdraw.h>
 
 #include "stage.hh"
 
@@ -156,6 +157,7 @@ static auto cameraStartPos = glm::vec3(0.0f, 10.0f, 35.0f );
 static int stageSelect = 0;
 static char dvdroot[512] = "D:\\Heroes\\dvdroot\0";
 static char dvdroot_out[512] = "";
+static float mouse_sensitivity;
 
 const char* getOutPath() {
 	return dvdroot_out[0] ? dvdroot_out : ".";
@@ -179,9 +181,7 @@ public:
 private:
 	void openTXD(const rc::util::FSPath& path) {
 		rc::util::FSPath txdPath(path);
-		rc::util::FSFile txdFile(txdPath);
-		auto x = txdFile.toBuffer();
-		sk::Buffer sk_x(x.base_ptr(), x.size(), false); // convert buffer utility classes
+		Buffer sk_x = txdPath.read();
 		rw::Chunk* root = rw::readChunk(sk_x);
 		root->dump(rw::util::DumpWriter());
 		txd = new TexDictionary((rw::TextureDictionary*) root);
@@ -216,8 +216,7 @@ private:
 			openBSPWorld(onePath, blkPath);
 		}
 		if (txcPath.exists()) {
-			rc::util::FSFile txcFile(txcPath);
-			auto b = txcFile.toBuffer();
+			auto b = txcPath.read();
 			txc = new TXCAnimation(b, txd);
 		}
 	}
@@ -243,14 +242,19 @@ private:
 		const char* dvdroot_out_ = config_get("dvdroot_out", dvdroot_out);
 		strncpy(dvdroot_out, dvdroot_out_, 512);
 
+		mouse_sensitivity = config_getf("mouse_sensitivity", 0.15f);
+
 		// setup bgfx
 		bgfx::setDebug( BGFX_DEBUG_TEXT );
 		mTime = 0.0f;
 		reset(BGFX_RESET_VSYNC);
+
+		ddInit();
 	}
 
 	int shutdown() override {
 		closeStage();
+		ddShutdown();
 		return 0;
 	}
 
@@ -352,6 +356,7 @@ private:
 			reset(state);
 		}
 
+		ImGui::SliderFloat("mouse sensitivity", &mouse_sensitivity, 0.05f, 0.45f);
 		ImGui::Checkbox("test window", &showTestWindow);
 	}
 
@@ -391,7 +396,7 @@ private:
 
 				inputLook.x = mouseX - mouseLastX;
 				inputLook.y = -(mouseY - mouseLastY);
-				inputLook *= 0.15f;
+				inputLook *= mouse_sensitivity;
 
 				glfwSetCursorPos(this->mWindow, this->getWidth() / 2.0, this->getHeight() / 2.0);
 				//mouseLastX = mouseX;
@@ -437,6 +442,13 @@ private:
 		camera.use(0, (float) getWidth() / getHeight());
 		bgfx::setViewRect( 0, 0, 0, uint16_t( getWidth() ), uint16_t( getHeight() ) );
 		bgfx::touch( 0 );
+
+		ddBegin(0);
+//		ddDrawAxis(0, 0, 0, 100.0f);
+//		float gridOrigin[3] = {floorf(camera.getPosition().x / 100) * 100, 0.0f, floorf(camera.getPosition().z / 100) * 100};
+//		ddDrawGrid(Axis::Y, gridOrigin, 200, 100.0f);
+		if (stage) stage->drawDebug(camera.getPosition());
+		ddEnd();
 
 		auto campos = camera.getPosition();
 		static bool showOverlay = true;

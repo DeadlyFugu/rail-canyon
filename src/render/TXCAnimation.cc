@@ -1,5 +1,4 @@
 #include "util/fspath.hh"
-#include "util/fsfile.hh"
 #include "TXCAnimation.hh"
 
 TXCAnimation::TXCAnimation(Buffer& data, TexDictionary* txd) {
@@ -166,7 +165,8 @@ void TXCAnimation::drawUI(TexDictionary* txd) {
 		char filename[32];
 		snprintf(filename, 32, "%s.txc", getStageFilename());
 		rc::util::FSPath outPath = outDVDRoot / filename;
-		rc::util::FSFile out(outPath);
+		Buffer out(0);
+		out.setStretchy(true);
 
 		for (auto& animation : animations) {
 			auto frameCountOffs = out.tell();
@@ -201,6 +201,8 @@ void TXCAnimation::drawUI(TexDictionary* txd) {
 			out.write((u32) 0xffffffff);
 		}
 		out.write((u32) 0xffffffff);
+
+		outPath.write(out);
 	}
 	hint("Write animations to file");
 	ImGui::Separator();

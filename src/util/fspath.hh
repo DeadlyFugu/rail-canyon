@@ -64,6 +64,12 @@ public:
 	// create a directory on the user's filesystem
 	// returns true if successful
 	bool mkDir();
+
+	// read to buffer
+	Buffer read();
+
+	// write to file (returns true on success)
+	bool write(Buffer& data);
 };
 
 // return FSPath representing directory containing game contents

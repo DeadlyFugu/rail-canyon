@@ -31,12 +31,16 @@ class VisibilityManager {
 	};
 	std::vector<VisibilityBlock> blocks;
 	bool fileExists = false;
-public:
+	bool showChunkBorders = false;
 	bool forceShowAll = false;
+	bool usePadding = true;
+public:
 	bool isVisible(int chunkId, glm::vec3 camPos);
 	void read(rc::util::FSPath& blkFile);
 
 	void drawUI(glm::vec3 camPos);
+
+	void drawDebug(glm::vec3 camPos);
 };
 
 class Stage {
@@ -49,4 +53,5 @@ public:
 	void draw(glm::vec3 camPos, TXCAnimation* txc);
 	void drawUI(glm::vec3 camPos);
 	void drawVisibilityUI(glm::vec3 camPos);
+	void drawDebug(glm::vec3 camPos);
 };
