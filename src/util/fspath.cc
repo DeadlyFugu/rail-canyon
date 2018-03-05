@@ -125,6 +125,7 @@ bool FSPath::mkDir() {
 bool FSPath::mkDir() {
 	return mkdir(str.c_str(), 0700) == 0;
 }
+#endif
 
 Buffer FSPath::read() {
 	FILE* f = fopen(str.c_str(), "rb");
@@ -161,8 +162,6 @@ bool FSPath::write(Buffer& data) {
 	}
 	fclose(f);
 }
-
-#endif
 
 #include "whereami.h"
 FSPath determineGameDir() {
