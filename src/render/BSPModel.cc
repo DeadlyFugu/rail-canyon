@@ -209,7 +209,7 @@ void BSPModel::draw(TXCAnimation* txc) {
 				bgfx::setUniform(uMaterialBits, &matBits);
 
 				// set state
-				uint64_t state = BGFX_STATE_RGB_WRITE;
+				uint64_t state = BGFX_STATE_RGB_WRITE | BGFX_STATE_MSAA;
 				state |= BGFX_STATE_ALPHA_WRITE;
 
 				if (!((renderBits & BIT_ADDITIVE) || (renderBits & BIT_FULL_ALPHA)))

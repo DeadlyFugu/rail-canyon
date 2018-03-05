@@ -255,7 +255,7 @@ private:
 	}
 
 	void onReset() override {
-		bgfx::setViewClear( 0, BGFX_CLEAR_COLOR | BGFX_CLEAR_DEPTH, 0x303030ff, 1.0f, 0 );
+		bgfx::setViewClear( 0, BGFX_CLEAR_COLOR | BGFX_CLEAR_DEPTH, /*0x303030ff*/ 0x000000ff, 1.0f, 0 );
 		bgfx::setViewRect( 0, 0, 0, uint16_t( getWidth() ), uint16_t( getHeight() ) );
 	}
 
@@ -334,9 +334,24 @@ private:
 		}
 
 		static bool vsync = true;
-		if (ImGui::Checkbox("vsync", &vsync)) {
-			reset(vsync ? BGFX_RESET_VSYNC : 0);
+		static int msaa = 0;
+		static const char* aaValues[] = { "none", "2x MSAA", "4x MSAA", "8x MSAA", "16x MSAA" };
+		bool stateDirty =
+			ImGui::Checkbox("vsync", &vsync) |
+			ImGui::Combo("anti-aliasing", &msaa, aaValues, 5, -1);
+
+		if (stateDirty) {
+			int state = 0;
+			if (vsync) state |= BGFX_RESET_VSYNC;
+			switch (msaa) {
+			case 1: state |= BGFX_RESET_MSAA_X2; break;
+			case 2: state |= BGFX_RESET_MSAA_X4; break;
+			case 3: state |= BGFX_RESET_MSAA_X8; break;
+			case 4: state |= BGFX_RESET_MSAA_X16; break;
+			}
+			reset(state);
 		}
+
 
 		ImGui::Checkbox("test window", &showTestWindow);
 	}
