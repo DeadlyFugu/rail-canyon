@@ -30,6 +30,9 @@ using rc::util::Buffer;
 
 #include "util/log.hh"
 
+#include "util.hh"
+using rw::util::logger;
+
 #define assert(x, msg) assert__(x, #x, msg, __func__, __FILE__, __LINE__)
 inline void assert__(bool cond, const char* x, const char* msg, const char* func, const char* file, int line);
 

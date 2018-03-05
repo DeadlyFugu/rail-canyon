@@ -20,7 +20,7 @@ void Stage::fromArchive(ONEArchive* archive, TexDictionary* txd) { // todo: uniq
 		if (root && root->type == RW_WORLD)
 			models.back().setFromWorldChunk(bspName, *((rw::WorldChunk*) root), txd);
 		else
-			log_warn("Invalid BSP file in ONE archive: %s", bspName);
+			logger.warn("Invalid BSP file in ONE archive: %s", bspName);
 	}
 }
 
@@ -37,23 +37,17 @@ void Stage::draw(glm::vec3 camPos, TXCAnimation* txc) {
 }
 
 void Stage::drawUI(glm::vec3 camPos) {
-	ImGui::Checkbox("Force Show All", &visibilityManager.forceShowAll);
-	if (ImGui::CollapsingHeader("Visibility List")) {
-		for (auto& model : models) {
-			if (visibilityManager.isVisible(model.getId(), camPos)) {
-				ImGui::LabelText("visible", "%s", model.getName());
-			}
-		}
+	for (auto& model : models) {
+		ImGui::PushID(model.getName());
+		ImGui::LabelText("chunk", "%s", model.getName());
+		ImGui::Checkbox("selected", &model.selected);
+		ImGui::LabelText("visible", "%s", visibilityManager.isVisible(model.getId(), camPos) ? "yes" : "no");
+		ImGui::PopID();
 	}
-	if (ImGui::CollapsingHeader("Chunks")) {
-		for (auto& model : models) {
-			ImGui::PushID(model.getName());
-			ImGui::LabelText("chunk", "%s", model.getName());
-			ImGui::Checkbox("selected", &model.selected);
-			ImGui::LabelText("visible", "%s", visibilityManager.isVisible(model.getId(), camPos) ? "yes" : "no");
-			ImGui::PopID();
-		}
-	}
+}
+
+void Stage::drawVisibilityUI(glm::vec3 camPos) {
+	visibilityManager.drawUI(camPos);
 }
 
 bool VisibilityManager::isVisible(int chunkId, glm::vec3 camPos) {
@@ -61,14 +55,9 @@ bool VisibilityManager::isVisible(int chunkId, glm::vec3 camPos) {
 	if (!chunkId) return true;
 	if (!fileExists) return true;
 
-	i32 x = (i32) camPos.x;
-	i32 y = (i32) camPos.y;
-	i32 z = (i32) camPos.z;
-
 	for (auto& block : blocks) {
 		if (block.chunk == chunkId) {
-			if (x >= block.low_x && y >= block.low_y && z >= block.low_z &&
-					x < block.high_x && y < block.high_y && z < block.high_z) {
+			if (block.contains(camPos)) {
 				return true;
 			}
 		}
@@ -90,16 +79,18 @@ static void swapEndianness(u32* value) {
 }
 
 void VisibilityManager::read(rc::util::FSPath& blkFile) {
-	rc::util::FSFile f(blkFile);
+	rc::util::FSFile f_(blkFile);
+	rc::util::Buffer b_ = f_.toBuffer();
+	rw::util::Buffer b(b_.base_ptr(), b_.size(), false);
 	fileExists = true;
 
 	for (int i = 0; i < 64; i++) {
-		if (f.atEnd()) {
-			log_warn("unexpected EoF in %s", blkFile.str.c_str());
+		if (b.remaining() < sizeof(VisibilityBlock)) {
+			logger.warn("unexpected EoF in %s", blkFile.str.c_str());
 			break;
 		}
 		VisibilityBlock block;
-		f.read(&block);
+		b.read(&block);
 
 		swapEndianness((u32*) &block.chunk);
 		swapEndianness((u32*) &block.low_x);
@@ -115,7 +106,28 @@ void VisibilityManager::read(rc::util::FSPath& blkFile) {
 
 		blocks.push_back(block);
 	}
-	if (!f.atEnd()) {
-		log_warn("excess data in %s", blkFile.str.c_str());
+	if (b.remaining()) {
+		logger.warn("excess data in %s", blkFile.str.c_str());
+	}
+}
+
+void VisibilityManager::drawUI(glm::vec3 camPos) {
+	ImGui::Checkbox("Force Show All", &forceShowAll);
+	int blockIdx = 1;
+	for (auto& block : blocks) {
+		ImGui::Separator();
+
+		ImGui::PushID(blockIdx);
+		if (block.contains(camPos)) ImGui::TextColored(ImVec4(0.0f, 0.75f, 1.0f, 1.0f), "Visibility Block %d", ++blockIdx);
+		else ImGui::Text("Visibility Block %d", blockIdx);
+		if (block.chunk == -1) {
+			if (ImGui::Button("Create")) block.chunk = 1;
+		} else {
+			ImGui::InputInt("Chunk", &block.chunk, 1, 1);
+			ImGui::DragInt3("AABB Low", &block.low_x);
+			ImGui::DragInt3("AABB High", &block.high_x);
+		}
+		ImGui::PopID();
+		blockIdx++;
 	}
 }

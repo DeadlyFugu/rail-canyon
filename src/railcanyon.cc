@@ -352,13 +352,13 @@ private:
 			reset(state);
 		}
 
-
 		ImGui::Checkbox("test window", &showTestWindow);
 	}
 
 	void update( float dt ) override {
 		mTime += dt;
-		if (!ImGui::GetIO().WantCaptureKeyboard) {
+		const auto keyboardActive = !ImGui::GetIO().WantCaptureKeyboard;
+		if (keyboardActive) {
 			glm::vec3 inputMove(0, 0, 0);
 			if (glfwGetKey(this->mWindow, GLFW_KEY_W))
 				inputMove.z += 1;
@@ -403,7 +403,7 @@ private:
 				glfwSetCursorPos(this->mWindow, this->getWidth() / 2.0, this->getHeight() / 2.0);
 				glfwGetCursorPos(this->mWindow, &mouseLastX, &mouseLastY);
 			}
-		} else if (!ImGui::GetIO().WantCaptureKeyboard) {
+		} else if (keyboardActive) {
 			if (glfwGetKey(this->mWindow, GLFW_KEY_UP))
 				inputLook.y += 1;
 			if (glfwGetKey(this->mWindow, GLFW_KEY_DOWN))
@@ -420,10 +420,20 @@ private:
 		camera.inputLookAxis(inputLook, dt);
 
 
-		if (!ImGui::GetIO().WantCaptureKeyboard && glfwGetKey(this->mWindow, GLFW_KEY_SPACE))
+		if (keyboardActive && glfwGetKey(this->mWindow, GLFW_KEY_SPACE))
 			camera.lookAt(vec3(0,0,0));
-		//camera.setPosition(eye);
-		//camera.lookAt(glm::vec3(0,0,0));
+
+		static bool showUI = true;
+		static bool showUIPress = false; // used to get tab as press
+		if (keyboardActive && glfwGetKey(this->mWindow, GLFW_KEY_TAB)) {
+			if (!showUIPress) {
+				showUI = !showUI;
+				showUIPress = true;
+			}
+		} else {
+			showUIPress = false;
+		}
+
 		camera.use(0, (float) getWidth() / getHeight());
 		bgfx::setViewRect( 0, 0, 0, uint16_t( getWidth() ), uint16_t( getHeight() ) );
 		bgfx::touch( 0 );
@@ -440,6 +450,7 @@ private:
 		}
 		ImGui::End();
 
+		if (!showUI) goto end_ui;
 		ImGui::SetNextWindowPos(ImVec2(10, 85));
 		static bool showSidePanel;
 		ImGui::SetNextWindowSize(ImVec2(300, getHeight() - 145.0f), ImGuiCond_Always);
@@ -447,14 +458,16 @@ private:
 			const char* menus[] = {
 					"Main",
 					"Stage",
+					"Visibility",
 					"TXD Archive",
 					"TXC Animations"
 			};
 			static int ui_select = 0;
 			ImGui::PushItemWidth(-1.0f);
-			ImGui::Combo("##uiselect", &ui_select, menus, 4);
+			ImGui::Combo("##uiselect", &ui_select, menus, 5);
 			ImGui::PopItemWidth();
 			ImGui::Separator();
+			ImGui::PushAllowKeyboardFocus(false);
 
 			switch (ui_select) {
 				case 0: {
@@ -468,13 +481,20 @@ private:
 					}
 				} break;
 				case 2: {
+					if (stage) {
+						stage->drawVisibilityUI(campos);
+					} else {
+						ImGui::TextColored(ImVec4(1.0f, 0.25f, 0.0f, 1.0f), "No stage is loaded");
+					}
+				} break;
+				case 3: {
 					if (txd) {
 						txd->drawUI();
 					} else {
 						ImGui::TextColored(ImVec4(1.0f, 0.25f, 0.0f, 1.0f), "No TXD is loaded");
 					}
 				} break;
-				case 3: {
+				case 4: {
 					if (txc) {
 						txc->drawUI(txd);
 					} else {
@@ -485,8 +505,10 @@ private:
 					ImGui::TextColored(ImVec4(1.0f, 0.25f, 0.0f, 1.0f), "Invalid menu selection");
 				}
 			}
+			ImGui::PopAllowKeyboardFocus();
 		}
 		ImGui::End();
+		end_ui:
 
 		if (showTestWindow) {
 			ImGui::ShowTestWindow(&showTestWindow);
