@@ -7,11 +7,6 @@
 #include "ONEArchive.hh"
 #include "util/prs.hh"
 
-namespace rc {
-namespace io {
-
-using util::FSPath;
-
 static const int ONE_HeroesMagic = 0x1400FFFF;
 static const int ONE_HeroesE3Magic = 0x1005FFFF;
 static const int ONE_HeroesPreE3Magic = 0x1003FFFF;
@@ -128,7 +123,4 @@ Buffer ONEArchive::readFile(int index) {
 
 Buffer ONEArchive::readFile(const char* name) {
 	return readFile(findFile(name));
-}
-
-}
 }

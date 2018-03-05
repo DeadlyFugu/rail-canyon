@@ -14,9 +14,6 @@
 #include <string>
 #include <vector>
 
-namespace rc {
-namespace util {
-
 class FSPath {
 	// data stored is implementation dependent
 	void* data = nullptr;
@@ -78,6 +75,3 @@ FSPath gameDir();
 // will correct forwardslashes to backslashes on Windows
 // will not work the other way around
 std::string pathFixSeparator(std::string path);
-
-}
-}

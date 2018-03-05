@@ -7,9 +7,6 @@
 #include "render/TexDictionary.hh"
 #include "render/TXCAnimation.hh"
 
-using rc::render::BSPModel;
-using rc::io::ONEArchive;
-
 class VisibilityManager {
 	struct VisibilityBlock {
 		i32 chunk;
@@ -36,7 +33,7 @@ class VisibilityManager {
 	bool usePadding = true;
 public:
 	bool isVisible(int chunkId, glm::vec3 camPos);
-	void read(rc::util::FSPath& blkFile);
+	void read(FSPath& blkFile);
 
 	void drawUI(glm::vec3 camPos);
 
@@ -49,7 +46,7 @@ class Stage {
 public:
 	~Stage();
 	void fromArchive(ONEArchive* x, TexDictionary* txd);
-	void readVisibility(rc::util::FSPath& blkFile);
+	void readVisibility(FSPath& blkFile);
 	void draw(glm::vec3 camPos, TXCAnimation* txc);
 	void drawUI(glm::vec3 camPos);
 	void drawVisibilityUI(glm::vec3 camPos);

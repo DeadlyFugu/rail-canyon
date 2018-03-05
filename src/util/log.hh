@@ -28,30 +28,27 @@
 #define MSG_BEGIN "["
 #define MSG_END "] "
 
-namespace rc {
-namespace util {
-
 // prints message
 void log_message(const char* prefix, const char* func, const char* format, ...);
 
 #ifdef PLATFORM_WIN
 // print info message to console
-#define log_info(fmt, ...)  rc::util::log_info_ (__func__, fmt, __VA_ARGS__)
+#define log_info(fmt, ...)  log_info_ (__func__, fmt, __VA_ARGS__)
 // print warning message to console
-#define log_warn(fmt, ...)  rc::util::log_warn_ (__func__, fmt, __VA_ARGS__)
+#define log_warn(fmt, ...)  log_warn_ (__func__, fmt, __VA_ARGS__)
 // print error message to console
-#define log_error(fmt, ...) rc::util::log_error_(__func__, fmt, __VA_ARGS__)
+#define log_error(fmt, ...) log_error_(__func__, fmt, __VA_ARGS__)
 // print debug message to console
-#define log_debug(fmt, ...) rc::util::log_debug_(__func__, fmt, __VA_ARGS__)
+#define log_debug(fmt, ...) log_debug_(__func__, fmt, __VA_ARGS__)
 #else
 // print info message to console
-#define log_info(fmt...)  rc::util::log_info_ (__func__, fmt)
+#define log_info(fmt...)  log_info_ (__func__, fmt)
 // print warning message to console
-#define log_warn(fmt...)  rc::util::log_warn_ (__func__, fmt)
+#define log_warn(fmt...)  log_warn_ (__func__, fmt)
 // print error message to console
-#define log_error(fmt...) rc::util::log_error_(__func__, fmt)
+#define log_error(fmt...) log_error_(__func__, fmt)
 // print debug message to console
-#define log_debug(fmt...) rc::util::log_debug_(__func__, fmt)
+#define log_debug(fmt...) log_debug_(__func__, fmt)
 #endif
 
 template<typename... Args>
@@ -72,7 +69,4 @@ void log_error_(const char* func, const char* format, Args... args) {
 template<typename... Args>
 void log_debug_(const char* func, const char* format, Args... args) {
 	log_message(MSG_BEGIN ANSI_GREEN "debug" ANSI_RESET MSG_END, func, format, args...);
-}
-
-}
 }

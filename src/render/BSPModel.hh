@@ -10,9 +10,6 @@
 
 class VisibilityManager;
 
-namespace rc {
-namespace render {
-
 const int BIT_REFLECTIVE = 1 << 0; // if N is not present
 const int BIT_SKY = 1 << 1; // if D is present
 const int BIT_OPAQUE = 1 << 2; // if O is present
@@ -60,6 +57,3 @@ public:
 	int getId();
 	const char* getName();
 };
-
-}
-}

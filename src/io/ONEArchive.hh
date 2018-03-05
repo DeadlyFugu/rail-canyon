@@ -6,9 +6,6 @@
 
 #include <vector>
 
-namespace rc {
-namespace io {
-
 class ONEArchive {
 private:
 	Buffer f;
@@ -26,7 +23,7 @@ private:
 	};
 	ArchiveType type;
 public:
-	ONEArchive(util::FSPath& path);
+	ONEArchive(FSPath& path);
 
 	int getFileCount();
 	const char* getFileName(int index);
@@ -34,6 +31,3 @@ public:
 	virtual Buffer readFile(int file);
 	virtual Buffer readFile(const char* name);
 };
-
-}
-}

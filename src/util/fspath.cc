@@ -6,9 +6,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-namespace rc {
-namespace util {
-
 void FSPath::statFile() {
 	if (data) return;
 	data = new struct stat();
@@ -197,7 +194,4 @@ std::string pathFixSeparator(std::string path) {
 	}
 #endif
 	return path;
-}
-
-}
 }

@@ -179,17 +179,17 @@ private:
 public:
 	RailCanyonApp() : camera(glm::vec3(0.f, 100.f, 350.f), glm::vec3(0,0,0), 60, 1.f, 960000.f) {}
 private:
-	void openTXD(const rc::util::FSPath& path) {
-		rc::util::FSPath txdPath(path);
+	void openTXD(const FSPath& path) {
+		FSPath txdPath(path);
 		Buffer sk_x = txdPath.read();
 		rw::Chunk* root = rw::readChunk(sk_x);
 		root->dump(rw::util::DumpWriter());
 		txd = new TexDictionary((rw::TextureDictionary*) root);
 	}
 
-	void openBSPWorld(rc::util::FSPath& onePath, rc::util::FSPath& blkPath) {
+	void openBSPWorld(FSPath& onePath, FSPath& blkPath) {
 		// read BSPs
-		rc::io::ONEArchive archive(onePath);
+		ONEArchive archive(onePath);
 		stage = new Stage();
 		stage->fromArchive(&archive, txd);
 		if (blkPath.exists())
@@ -199,13 +199,13 @@ private:
 	void openStage(const char* name) {
 		char buffer[512];
 		sprintf(buffer, "%s/textures/%s.txd", dvdroot, name);
-		rc::util::FSPath txdPath(buffer);
+		FSPath txdPath(buffer);
 		sprintf(buffer, "%s/%s.one", dvdroot, name);
-		rc::util::FSPath onePath(buffer);
+		FSPath onePath(buffer);
 		sprintf(buffer, "%s/%s_blk.bin", dvdroot, name);
-		rc::util::FSPath blkPath(buffer);
+		FSPath blkPath(buffer);
 		sprintf(buffer, "%s/%s.txc", dvdroot, name);
-		rc::util::FSPath txcPath(buffer);
+		FSPath txcPath(buffer);
 
 		if (!txdPath.exists()) {
 			rw::util::logger.error("missing .txd");
@@ -273,7 +273,7 @@ private:
 			dvdrootExistsDirty = true;
 		}
 		if (dvdrootExistsDirty) {
-			rc::util::FSPath dvdrootPath(dvdroot);
+			FSPath dvdrootPath(dvdroot);
 			dvdrootExists = dvdrootPath.exists();
 
 			if (dvdrootExists) {
@@ -293,7 +293,7 @@ private:
 			dvdrootOutExistsDirty = true;
 		}
 		if (dvdrootOutExistsDirty) {
-			rc::util::FSPath dvdrootOutPath(dvdroot_out);
+			FSPath dvdrootOutPath(dvdroot_out);
 			dvdrootOutExists = dvdrootOutPath.exists() || !dvdroot_out[0]; // if empty string, also counts as exists
 
 			if (dvdrootOutExists) {

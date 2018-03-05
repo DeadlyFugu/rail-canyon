@@ -161,10 +161,10 @@ void TXCAnimation::drawUI(TexDictionary* txd) {
 	hint("Deletes the selected animation");
 	ImGui::SameLine();
 	if (ImGui::Button("save all")) {
-		rc::util::FSPath outDVDRoot(getOutPath());
+		FSPath outDVDRoot(getOutPath());
 		char filename[32];
 		snprintf(filename, 32, "%s.txc", getStageFilename());
-		rc::util::FSPath outPath = outDVDRoot / filename;
+		FSPath outPath = outDVDRoot / filename;
 		Buffer out(0);
 		out.setStretchy(true);
 

@@ -4,9 +4,6 @@
 
 #include <stdint.h>
 
-namespace rc {
-namespace types {
-
 typedef uint8_t u8;
 typedef uint16_t u16;
 typedef uint32_t u32;
@@ -82,18 +79,3 @@ union general64 {
 static_assert(sizeof(general16) == 2, "general16 must be 2 bytes");
 static_assert(sizeof(general32) == 4, "general32 must be 4 bytes");
 static_assert(sizeof(general64) == 8, "general64 must be 8 bytes");
-
-// STL includes
-/*#include <string>
-#include <vector>
-#include <map>
-#include <list>
-#include <stack>
-#include <set>
-
-using std::string;
-using std::vector;
-using std::list;*/
-
-}
-}

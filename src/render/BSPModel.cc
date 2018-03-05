@@ -2,9 +2,6 @@
 #include "BSPModel.hh"
 #include <bigg.hpp>
 
-namespace rc {
-namespace render {
-
 bgfx::ProgramHandle bspProgram;
 bgfx::UniformHandle uSamplerTexture;
 bgfx::UniformHandle uMaterialColor;
@@ -242,7 +239,4 @@ int BSPModel::getId() {
 
 const char* BSPModel::getName() {
 	return name.c_str();
-}
-
-}
 }

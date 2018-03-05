@@ -23,11 +23,6 @@ using std::move;
 #endif
 
 #include "util/types.hh"
-using namespace rc::types;
-
-//#include "util/buffer.hh"
-//using rc::util::Buffer;
-
 #include "util/log.hh"
 
 #include "util.hh"
@@ -40,8 +35,8 @@ inline void assert__(bool cond, const char* x, const char* msg, const char* func
 extern "C" void abort();
 inline void assert__(bool cond, const char* x, const char* msg, const char* func, const char* file, int line) {
 	if (!cond) {
-		rc::util::log_error_(func, "assert(%s) failed: %s", x, msg);
-		rc::util::log_error_(func, "at %s:%i", file, line);
+		log_error_(func, "assert(%s) failed: %s", x, msg);
+		log_error_(func, "at %s:%i", file, line);
 		abort();
 	}
 }

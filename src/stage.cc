@@ -25,7 +25,7 @@ void Stage::fromArchive(ONEArchive* archive, TexDictionary* txd) { // todo: uniq
 	}
 }
 
-void Stage::readVisibility(rc::util::FSPath& blkFile) {
+void Stage::readVisibility(FSPath& blkFile) {
 	visibilityManager.read(blkFile);
 }
 
@@ -83,7 +83,7 @@ static void swapEndianness(u32* value) {
 	out->bytes[3] = tmp.bytes[0];
 }
 
-void VisibilityManager::read(rc::util::FSPath& blkFile) {
+void VisibilityManager::read(FSPath& blkFile) {
 	Buffer b = blkFile.read();
 	fileExists = true;
 
