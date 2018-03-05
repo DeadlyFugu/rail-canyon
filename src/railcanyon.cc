@@ -167,6 +167,78 @@ const char* getStageFilename() {
 	return stageFileNames[stageSelect];
 }
 
+// from https://github.com/bkaradzic/bgfx/blob/master/examples/07-callback/callback.cpp
+#include <bx/file.h>
+#include <bx/debug.h>
+#include <bimg/bimg.h>
+static void savePNG(const char* _filePath, uint32_t _width, uint32_t _height, uint32_t _srcPitch, const void* _src, bool _grayscale, bool _yflip) {
+	bx::FileWriter writer;
+	bx::Error err;
+	if (bx::open(&writer, _filePath, false, &err) ) {
+		const u8* data = (const u8*) _src;
+		for (int i = 0; i < _height; i++) {
+			for (int j = 0; j < _width; j++) {
+				u8* pixel = const_cast<u8*>(&data[j*4]); // dangerous but w/e
+				pixel[3] = 0xff;
+			}
+			data += _srcPitch;
+		}
+		bimg::imageWritePng(&writer, _width, _height, _srcPitch, _src, _grayscale, _yflip, &err);
+		bx::close(&writer);
+	}
+}
+
+struct BgfxCallback : public bgfx::CallbackI {
+	virtual ~BgfxCallback() {}
+
+	virtual void fatal(bgfx::Fatal::Enum _code, const char* _str) override {
+		bx::debugPrintf("Fatal error: 0x%08x: %s", _code, _str);
+		abort();
+	}
+
+	virtual void traceVargs(const char* _filePath, uint16_t _line, const char* _format, va_list _argList) override {
+		bx::debugPrintf("%s (%d): ", _filePath, _line);
+		bx::debugPrintfVargs(_format, _argList);
+	}
+
+	virtual void profilerBegin(const char* _name, uint32_t _abgr, const char* _filePath, uint16_t _line) override {}
+	virtual void profilerBeginLiteral(const char* _name, uint32_t _abgr, const char* _filePath, uint16_t _line) override {}
+
+	virtual void profilerEnd() override {}
+
+	virtual uint32_t cacheReadSize(uint64_t _id) override {return 0;}
+
+	virtual bool cacheRead(uint64_t _id, void* _data, uint32_t _size) override {return false;}
+	virtual void cacheWrite(uint64_t _id, const void* _data, uint32_t _size) override {}
+
+	virtual void screenShot(const char* _filePath, uint32_t _width, uint32_t _height, uint32_t _pitch, const void* _data, uint32_t /*_size*/, bool _yflip) override {
+		savePNG(_filePath, _width, _height, _pitch, _data, false, _yflip);
+	}
+
+	virtual void captureBegin(uint32_t _width, uint32_t _height, uint32_t _pitch, bgfx::TextureFormat::Enum _format, bool _yflip) override {}
+	virtual void captureEnd() override {}
+	virtual void captureFrame(const void* _data, uint32_t _size) override {}
+};
+
+bool screenshot() {
+	FSPath screenshots("screenshots");
+	if (!screenshots.exists()) {
+		auto result = screenshots.mkDir();
+		if (!result) return false;
+	}
+
+	FSPath file("");
+	char buffer[512];
+	int idx = 0;
+	do {
+		snprintf(buffer, 512, "%s_%03d.png", getStageFilename(), ++idx);
+		file = screenshots / buffer;
+	} while (file.exists());
+
+	bgfx::requestScreenShot(BGFX_INVALID_HANDLE, file.str.c_str());
+	return true;
+}
+
 class RailCanyonApp : public bigg::Application {
 private:
 	Camera camera;
@@ -176,6 +248,8 @@ private:
 	TXCAnimation* txc = nullptr;
 
 	bool showTestWindow = false;
+	bool showPanel = true;
+	int screenshotNextFrame = 0;
 public:
 	RailCanyonApp() : camera(glm::vec3(0.f, 100.f, 350.f), glm::vec3(0,0,0), 60, 1.f, 960000.f) {}
 private:
@@ -358,6 +432,11 @@ private:
 
 		ImGui::SliderFloat("mouse sensitivity", &mouse_sensitivity, 0.05f, 0.45f);
 		ImGui::Checkbox("test window", &showTestWindow);
+		ImGui::Checkbox("panel", &showPanel);
+
+		if (ImGui::Button("Screenshot [F2]")) {
+			screenshotNextFrame = 1;
+		}
 	}
 
 	void update( float dt ) override {
@@ -439,6 +518,16 @@ private:
 			showUIPress = false;
 		}
 
+		static bool screenshotPress = false; // used to get F2 as press
+		if (keyboardActive && glfwGetKey(this->mWindow, GLFW_KEY_F2)) {
+			if (!screenshotPress) {
+				screenshotNextFrame = true;
+				screenshotPress = true;
+			}
+		} else {
+			screenshotPress = false;
+		}
+
 		camera.use(0, (float) getWidth() / getHeight());
 		bgfx::setViewRect( 0, 0, 0, uint16_t( getWidth() ), uint16_t( getHeight() ) );
 		bgfx::touch( 0 );
@@ -452,6 +541,7 @@ private:
 
 		auto campos = camera.getPosition();
 		static bool showOverlay = true;
+		if (!showPanel) goto end_overlay;
 		ImGui::SetNextWindowPos(ImVec2(10,10));
 		if (ImGui::Begin("dispoverlay", &showOverlay, ImVec2(240,0), 0.3f, ImGuiWindowFlags_NoTitleBar|ImGuiWindowFlags_NoResize|ImGuiWindowFlags_NoMove|ImGuiWindowFlags_NoSavedSettings))
 		{
@@ -461,8 +551,9 @@ private:
 			ImGui::Text("FPS: %0.3f", 1.0f / dt);
 		}
 		ImGui::End();
+		end_overlay:
 
-		if (!showUI) goto end_ui;
+		if (screenshotNextFrame || !showUI) goto end_ui;
 		ImGui::SetNextWindowPos(ImVec2(10, 85));
 		static bool showSidePanel;
 		ImGui::SetNextWindowSize(ImVec2(300, getHeight() - 145.0f), ImGuiCond_Always);
@@ -522,7 +613,7 @@ private:
 		ImGui::End();
 		end_ui:
 
-		if (showTestWindow) {
+		if (showTestWindow && !screenshotNextFrame) {
 			ImGui::ShowTestWindow(&showTestWindow);
 		}
 
@@ -533,6 +624,13 @@ private:
 		if (stage) {
 			stage->draw(campos, txc);
 		}
+
+		if (screenshotNextFrame == 1) {
+			screenshotNextFrame++;
+		} else if (screenshotNextFrame) {
+			screenshot();
+			screenshotNextFrame = 0;
+		}
 	}
 };
 
@@ -540,5 +638,6 @@ private:
 #include "chunk.hh"
 int main( int argc, char** argv ) {
 	RailCanyonApp app;
-	return app.run( argc, argv );
+	BgfxCallback callback;
+	return app.run( argc, argv, bgfx::RendererType::Count, 0, 0, &callback, nullptr );
 }

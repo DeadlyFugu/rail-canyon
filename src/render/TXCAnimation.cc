@@ -243,7 +243,7 @@ void TXCAnimation::drawUI(TexDictionary* txd) {
 		ImGui::Separator();
 
 		// automatic frame generation
-		bool generate_dirty = false;
+		static bool generate_dirty = false;
 		ImGui::Text("Automatic Frame Generation");
 		ImGui::PushItemWidth(-150.0f);
 		if (ImGui::DragInt("First Texture", &animation.generate_begin_texture, 0.1f, 1, 99)) generate_dirty = true;
@@ -253,7 +253,7 @@ void TXCAnimation::drawUI(TexDictionary* txd) {
 		if (ImGui::DragInt("Frame Duration", &animation.generate_frame_duration, 0.1f, 1, 99)) generate_dirty = true;
 		hint("How many in-game frames to display a frame of the animation for\n'In-game frames' are measured at 60fps");
 		ImGui::PopItemWidth();
-		if (ImGui::Button("Generate") || animation.generate_auto) {
+		if (ImGui::Button("Generate") || (animation.generate_auto && generate_dirty)) {
 			auto& frameDeltas = animation.frameDeltas;
 			frameDeltas.clear();
 			int i = animation.generate_begin_texture;
@@ -268,7 +268,7 @@ void TXCAnimation::drawUI(TexDictionary* txd) {
 		}
 		hint("Pressing this button will wipe all frames below and automatically generate new ones based on the above parameters");
 		ImGui::SameLine();
-		ImGui::Checkbox("generate automatically", &animation.generate_auto);
+		generate_dirty = ImGui::Checkbox("generate automatically", &animation.generate_auto); // reset generate dirty & set to true if auto was enabled
 		hint("If this is enabled, frames below will automatically be wiped and regenerated each time a change is detected to the parameters");
 		ImGui::Separator();
 
@@ -307,19 +307,25 @@ void TXCAnimation::drawUI(TexDictionary* txd) {
 			}
 			if (isFrameError) ImGui::PopStyleColor(3);
 			if (isFrameActive) ImGui::PopStyleColor(1);
-			if (isFrameError)
-				hint("Index of texture to use for this frame (number after the dot)\n"
-				"That texture could not be found in the TXD");
-			else
-				hint("Index of texture to use for this frame (number after the dot)");
+			if (isFrameError) {
+				hint("That texture could not be found in the TXD");
+			} else if (ImGui::IsItemHovered() || ImGui::IsItemActive()) {
+				ImGui::BeginTooltip();
+				BiggImTexture img;
+				img.s.flags = 0; // unused
+				img.s.handle = getTextureNumbered(txd, animation, frame.textureID);
+				ImGui::Image(img.ptr, ImVec2(128,128), ImVec2(0,0), ImVec2(1,1), ImColor(255,255,255,255), ImColor(255,255,255,128));
+				ImGui::EndTooltip();
+			}
+
 			if (isFrameActive) ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.0f, 0.75f, 1.0f, 1.0f));
 			ImGui::NextColumn();
 			if (ImGui::DragInt("##duration", &duration, 0.1f, 0, animation.frameCount)) {
 				frame.duration = (u16) duration;
 				deltasModified = true;
 			}
-			hint("How many frames to show this texture for (measured in frames at 60fps)");
 			if (isFrameActive) ImGui::PopStyleColor(1);
+			hint("How many frames to show this texture for (measured in frames at 60fps)");
 			ImGui::NextColumn();
 			if (ImGui::Button("...")) {
 				ImGui::OpenPopup("Actions");

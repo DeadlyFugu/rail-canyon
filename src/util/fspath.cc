@@ -17,22 +17,19 @@ void FSPath::statFile() {
 
 
 FSPath::~FSPath() {
-	if (data) delete data;
-}
-
-
-FSPath::FSPath(const FSPath& other) : str(other.str) {
-	if (other.data) {
-		data = new struct stat();
-		memcpy(data, other.data, sizeof(struct stat));
+	if (data) {
+		delete data;
+		data = 0;
 	}
 }
 
+
+FSPath::FSPath(const FSPath& other) : str(other.str), data(nullptr) {}
+
 FSPath& FSPath::operator=(const FSPath& other) {
-	if (this != &other) {
-		if (data) delete data;
-		data = new struct stat();
-		memcpy(data, other.data, sizeof(struct stat));
+	if (data) {
+		delete data;
+		data = 0;
 	}
 	str = other.str;
 
