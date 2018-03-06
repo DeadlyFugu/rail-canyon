@@ -338,7 +338,7 @@ private:
 	}
 
 	void drawMainUI() {
-		ImGui::Text("RailCanyon v0.2 [pre-release]");
+		ImGui::Text("RailCanyon v0.2");
 
 		// dvdroot
 		static bool dvdrootExistsDirty = true;
@@ -411,12 +411,14 @@ private:
 			ImGui::EndPopup();
 		}
 
-		static bool vsync = true;
-		static int msaa = 0;
+		static bool vsync = config_geti("vsync", 1) != 0;
+		static int msaa = config_geti("msaa", 0);
 		static const char* aaValues[] = { "none", "2x MSAA", "4x MSAA", "8x MSAA", "16x MSAA" };
+		static bool firstResetNeeded = true;
 		bool stateDirty =
 			ImGui::Checkbox("vsync", &vsync) |
-			ImGui::Combo("anti-aliasing", &msaa, aaValues, 5, -1);
+			ImGui::Combo("anti-aliasing", &msaa, aaValues, 5, -1) |
+			firstResetNeeded;
 
 		if (stateDirty) {
 			int state = 0;
@@ -428,9 +430,14 @@ private:
 			case 4: state |= BGFX_RESET_MSAA_X16; break;
 			}
 			reset(state);
+			config_seti("vsync", vsync);
+			config_seti("msaa", msaa);
+			firstResetNeeded = false;
 		}
 
-		ImGui::SliderFloat("mouse sensitivity", &mouse_sensitivity, 0.05f, 0.45f);
+		if (ImGui::SliderFloat("mouse sensitivity", &mouse_sensitivity, 0.05f, 0.45f)) {
+			config_setf("mouse_sensitivity", mouse_sensitivity);
+		}
 		ImGui::Checkbox("test window", &showTestWindow);
 		ImGui::Checkbox("panel", &showPanel);
 
