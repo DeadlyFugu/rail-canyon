@@ -35,6 +35,8 @@ void Stage::draw(glm::vec3 camPos, TXCAnimation* txc) {
 			model.draw(txc);
 		}
 	}
+
+	if (layout) layout->draw(camPos);
 }
 
 void Stage::drawUI(glm::vec3 camPos) {
@@ -55,6 +57,21 @@ void Stage::drawDebug(glm::vec3 camPos) {
 	visibilityManager.drawDebug(camPos);
 }
 
+void Stage::readLayout(FSPath& binFile) {
+	layout = new ObjectLayout();
+	layout->read(binFile);
+}
+
+void Stage::readCache(FSPath& oneFile, TexDictionary* txd) {
+	if (!cache) cache = new DFFCache();
+	cache->addFromArchive(oneFile, txd);
+}
+
+void Stage::drawLayoutUI(glm::vec3 camPos) {
+	if (layout) layout->drawUI(camPos);
+	else ImGui::TextColored(ImVec4(1.0f, 0.25f, 0.0f, 1.0f), "No stage is loaded");
+}
+
 bool VisibilityManager::isVisible(int chunkId, glm::vec3 camPos) {
 	if (forceShowAll) return true;
 	if (!chunkId) return true;
@@ -70,7 +87,7 @@ bool VisibilityManager::isVisible(int chunkId, glm::vec3 camPos) {
 	return false;
 }
 
-static void swapEndianness(u32* value) {
+static u32 swapEndianness(u32* value) {
 	union IntBytes {
 		u32 as_int;
 		u8 bytes[4];
@@ -81,6 +98,22 @@ static void swapEndianness(u32* value) {
 	out->bytes[1] = tmp.bytes[2];
 	out->bytes[2] = tmp.bytes[1];
 	out->bytes[3] = tmp.bytes[0];
+
+	return *value;
+}
+
+static u16 swapEndianness(u16* value) {
+	u16 tmp = (u8) *value;
+	*value = *value >> 8;
+	*value |= tmp << 8;
+
+	return *value;
+}
+
+static float swapEndianness(float* value) {
+	swapEndianness((u32*) value);
+
+	return *value;
 }
 
 void VisibilityManager::read(FSPath& blkFile) {
@@ -158,5 +191,101 @@ void VisibilityManager::drawDebug(glm::vec3 camPos) {
 			ddDraw(box);
 			ddPop();
 		}
+	}
+}
+
+void DFFCache::addFromArchive(FSPath& onePath, TexDictionary* txd) {
+	ONEArchive* one = new ONEArchive(onePath);
+
+	const auto fileCount = one->getFileCount();
+	for (int i = 0; i < fileCount; i++) {
+		const auto fileName = one->getFileName(i);
+		const auto fileNameLen = strlen(fileName);
+
+		if (fileName[fileNameLen-4] == '.' && fileName[fileNameLen-3] == 'D' && fileName[fileNameLen-2] == 'F' && fileName[fileNameLen-1] == 'F') {
+			DFFModel* dff = new DFFModel();
+			Buffer b = one->readFile(i);
+			rw::ClumpChunk* clump = (rw::ClumpChunk*) rw::readChunk(b);
+			dff->setFromClump(clump, txd);
+
+			cache[std::string(fileName)] = dff;
+		}
+	}
+}
+
+DFFModel* DFFCache::getDFF(const char* name) {
+	auto result = cache.find(std::string(name));
+	if (result == cache.end()) return nullptr;
+	else return result->second;
+}
+
+void ObjectLayout::read(FSPath& binFile) {
+	Buffer b = binFile.read();
+	b.seek(0);
+
+	for (int i = 0; i < 2048; i++) {
+		struct {
+			float x, y, z;
+			u32 rx, ry, rz;
+			u16 unused_1;
+			u8 team;
+			u8 must_be_odd;
+			u32 unused_2;
+			u64 unused_repeat;
+			u16 type;
+			u8 linkID;
+			u8 radius;
+			u16 unused_3;
+			u16 miscID;
+		} instance;
+
+		b.read(&instance);
+
+		if (instance.type) {
+			objects.emplace_back();
+			auto& obj = objects.back();
+
+			obj.pos_x = swapEndianness(&instance.x);
+			obj.pos_y = swapEndianness(&instance.y);
+			obj.pos_z = swapEndianness(&instance.z);
+			obj.rot_x = swapEndianness(&instance.rx);
+			obj.rot_y = swapEndianness(&instance.ry);
+			obj.rot_z = swapEndianness(&instance.rz);
+			obj.type = swapEndianness(&instance.type);
+			obj.linkID = instance.linkID;
+			obj.radius = instance.radius;
+
+			auto returnOffs = b.tell();
+			b.seek(0x18000u + 0x24 * instance.miscID + 0x04);
+			if (b.tell() < b.size())
+				b.read(&obj.misc);
+			b.seek(returnOffs);
+		}
+	}
+}
+
+void ObjectLayout::draw(glm::vec3 camPos) {
+	const Aabb box = {
+			{-5, -5, -5},
+			{5, 5, 5},
+	};
+	for (auto& object : objects) {
+		ddPush();
+		ddSetTranslate(object.pos_x, object.pos_y, object.pos_z);
+		ddSetState(true, true, false);
+		ddDraw(box);
+		ddPop();
+	}
+}
+
+void ObjectLayout::drawUI(glm::vec3 camPos) {
+	static int obSel = 0;
+	ImGui::Text("Layout contains %d instances", objects.size());
+	ImGui::DragInt("instance", &obSel, 1.0f, 0, objects.size() - 1);
+
+	if (obSel >= 0 && obSel < objects.size()) {
+		auto& obj = objects[obSel];
+		ImGui::Text("Type: [%02x][%02x]", obj.type >> 8, obj.type & 0xff);
+		ImGui::DragFloat3("Position", &obj.pos_x);
 	}
 }

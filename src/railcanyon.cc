@@ -285,6 +285,8 @@ private:
 		FSPath blkPath(buffer);
 		sprintf(buffer, "%s/%s.txc", dvdroot, name);
 		FSPath txcPath(buffer);
+		sprintf(buffer, "%s/%s_DB.bin", dvdroot, name);
+		FSPath dbPath(buffer);
 
 		if (!txdPath.exists()) {
 			rw::util::logger.error("missing .txd");
@@ -293,6 +295,7 @@ private:
 		} else {
 			openTXD(txdPath);
 			openBSPWorld(onePath, blkPath);
+			stage->readLayout(dbPath);
 		}
 		if (txcPath.exists()) {
 			auto b = txcPath.read();
@@ -648,11 +651,13 @@ private:
 					"Stage",
 					"Visibility",
 					"TXD Archive",
-					"TXC Animations"
+					"TXC Animations",
+					"Object Layout",
+					"DFF Cache",
 			};
 			static int ui_select = 0;
 			ImGui::PushItemWidth(-1.0f);
-			ImGui::Combo("##uiselect", &ui_select, menus, 5);
+			ImGui::Combo("##uiselect", &ui_select, menus, 7);
 			ImGui::PopItemWidth();
 			ImGui::Separator();
 			ImGui::PushAllowKeyboardFocus(false);
@@ -687,6 +692,13 @@ private:
 						txc->drawUI(txd);
 					} else {
 						ImGui::TextColored(ImVec4(1.0f, 0.25f, 0.0f, 1.0f), "No TXC is loaded");
+					}
+				} break;
+				case 5: {
+					if (stage) {
+						stage->drawLayoutUI(campos);
+					} else {
+						ImGui::TextColored(ImVec4(1.0f, 0.25f, 0.0f, 1.0f), "No stage is loaded");
 					}
 				} break;
 				default: {

@@ -6,6 +6,7 @@
 #include <bigg.hpp>
 #include "render/TexDictionary.hh"
 #include "render/TXCAnimation.hh"
+#include "render/DFFModel.hh"
 
 class VisibilityManager {
 	struct VisibilityBlock {
@@ -40,15 +41,52 @@ public:
 	void drawDebug(glm::vec3 camPos);
 };
 
+class DFFCache {
+private:
+	std::map<std::string, DFFModel*> cache;
+public:
+	void addFromArchive(FSPath& onePath, TexDictionary* txd);
+	DFFModel* getDFF(const char* name);
+};
+
+class ObjectLayout {
+private:
+	struct ObjectInstance {
+		float pos_x;
+		float pos_y;
+		float pos_z;
+		u32 rot_x;
+		u32 rot_y;
+		u32 rot_z;
+		u16 type;
+		u8 linkID;
+		u8 radius;
+		u8 misc[32];
+	};
+
+	std::vector<ObjectInstance> objects;
+public:
+	void read(FSPath& binFile);
+
+	void draw(glm::vec3 camPos);
+	void drawUI(glm::vec3 camPos);
+};
+
 class Stage {
 	std::list<BSPModel> models;
 	VisibilityManager visibilityManager;
+	ObjectLayout* layout = nullptr;
+	DFFCache* cache = nullptr;
 public:
 	~Stage();
 	void fromArchive(ONEArchive* x, TexDictionary* txd);
 	void readVisibility(FSPath& blkFile);
+	void readLayout(FSPath& binFile);
 	void draw(glm::vec3 camPos, TXCAnimation* txc);
 	void drawUI(glm::vec3 camPos);
 	void drawVisibilityUI(glm::vec3 camPos);
+	void drawLayoutUI(glm::vec3 camPos);
 	void drawDebug(glm::vec3 camPos);
+
+	void readCache(FSPath& oneFile, TexDictionary* txd);
 };
