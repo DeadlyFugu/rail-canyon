@@ -7,18 +7,9 @@
 #include "bgfx/bgfx.h"
 #include "render/TexDictionary.hh"
 #include "render/TXCAnimation.hh"
+#include "render/MaterialList.hh"
 
 class VisibilityManager;
-
-const int BIT_REFLECTIVE = 1 << 0; // if N is not present
-const int BIT_SKY = 1 << 1; // if D is present
-const int BIT_OPAQUE = 1 << 2; // if O is present
-const int BIT_SHADOW = 1 << 3; // if S is present
-const int BIT_NO_CULL = 1 << 4; // if W is present
-const int BIT_PUNCH_ALPHA = 1 << 5; // if P is present
-const int BIT_FULL_ALPHA = 1 << 6; // if A is present
-const int BIT_ADDITIVE = 1 << 7; // if K is present
-const int BIT_UNKNOWN_F = 1 << 8; // if F is present
 
 class BSPModel {
 private:
@@ -26,7 +17,8 @@ private:
 		uint32_t color;
 		bgfx::TextureHandle texture;
 	};
-	std::vector<Material> materials;
+	//std::vector<Material> materials;
+	MaterialList* matList;
 
 	struct BinMesh {
 		bgfx::IndexBufferHandle indices;
@@ -41,7 +33,7 @@ private:
 	std::vector<Section> sections;
 
 	bool hasData = false;
-	int renderBits;
+	int renderBits = 0;
 	int id;
 	std::string name;
 	void clear();

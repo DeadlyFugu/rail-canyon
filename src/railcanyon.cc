@@ -11,9 +11,11 @@
 #include "render/TexDictionary.hh"
 #include "render/TXCAnimation.hh"
 #include "util/config.hh"
+#include "render/DFFModel.hh"
 
 const char* stageDisplayNames[] = {
 		"<none>",
+		"<DFF>",
 		"Test Level [stg00]",
 		"Seaside Hill [s01]",
 		"Ocean Palace [s02]",
@@ -78,6 +80,7 @@ const char* stageDisplayNames[] = {
 };
 
 const char* stageFileNames[] = {
+		0,
 		0,
 		"stg00",
 		"s01",
@@ -246,10 +249,12 @@ private:
 	Stage* stage = nullptr;
 	TexDictionary* txd = nullptr;
 	TXCAnimation* txc = nullptr;
+	DFFModel* dff = nullptr;
 
 	bool showTestWindow = false;
 	bool showPanel = true;
 	int screenshotNextFrame = 0;
+	float bgColor[3];
 public:
 	RailCanyonApp() : camera(glm::vec3(0.f, 100.f, 350.f), glm::vec3(0,0,0), 60, 1.f, 960000.f) {}
 private:
@@ -308,6 +313,10 @@ private:
 			delete txc;
 			txc = nullptr;
 		}
+		if (dff) {
+			delete dff;
+			dff = nullptr;
+		}
 	}
 	void initialize( int _argc, char** _argv ) override {
 		// read config
@@ -332,8 +341,16 @@ private:
 		return 0;
 	}
 
+	void setBackground() {
+		uint32_t color = 0x000000ff;
+		color |= uint8_t(bgColor[0] * 255.f) << 24;
+		color |= uint8_t(bgColor[1] * 255.f) << 16;
+		color |= uint8_t(bgColor[2] * 255.f) <<  8;
+		bgfx::setViewClear( 0, BGFX_CLEAR_COLOR | BGFX_CLEAR_DEPTH, /*0x303030ff*/ color, 1.0f, 0 );
+	}
+
 	void onReset() override {
-		bgfx::setViewClear( 0, BGFX_CLEAR_COLOR | BGFX_CLEAR_DEPTH, /*0x303030ff*/ 0x000000ff, 1.0f, 0 );
+		setBackground();
 		bgfx::setViewRect( 0, 0, 0, uint16_t( getWidth() ), uint16_t( getHeight() ) );
 	}
 
@@ -383,7 +400,7 @@ private:
 			closeStage();
 			camera.setPosition(cameraStartPos);
 			camera.lookAt(vec3(0, 0, 0));
-			if (stageSelect) {
+			if (stageFileNames[stageSelect]) {
 				error_log.clear();
 				rw::util::logger.setPrintCallback(recordStreamErrorLog);
 				openStage(stageFileNames[stageSelect]);
@@ -392,6 +409,60 @@ private:
 					log_info("open popup");
 					ImGui::OpenPopup("Error Log");
 				}
+			}
+		}
+
+		if (stageSelect == 1) { // <DFF>
+			static char archivePath[128];
+			static std::vector<const char*> archiveDFFs;
+			static bool archiveExists = false;
+			static bool archiveExistsDirty = true;
+			static int dffSelect;
+			static ONEArchive* one;
+
+			if (ImGui::InputText("ONE archive", archivePath, 128)) archiveExistsDirty = true;
+
+			if (archiveExistsDirty) {
+				archiveExistsDirty = false;
+				archiveDFFs.clear();
+				if (one) {
+					delete one;
+					one = nullptr;
+				}
+
+				FSPath archiveFSPath = FSPath(dvdroot) / archivePath;
+
+				if (!archiveFSPath.exists()) {
+					archiveExists = false;
+				} else {
+					archiveExists = true;
+
+					one = new ONEArchive(archiveFSPath);
+
+					const auto fileCount = one->getFileCount();
+					for (int i = 0; i < fileCount; i++) {
+						archiveDFFs.push_back(one->getFileName(i));
+					}
+				}
+			}
+
+			if (archiveExists) {
+				if (ImGui::Combo("dff", &dffSelect, &archiveDFFs[0], (int) archiveDFFs.size())) {
+					if (dff) delete dff;
+					dff = new DFFModel();
+					Buffer b = one->readFile(archiveDFFs[dffSelect]);
+					rw::ClumpChunk* clump = (rw::ClumpChunk*) rw::readChunk(b);
+					dff->setFromClump(clump, txd);
+				}
+			} else {
+				ImGui::TextColored(ImVec4(1.0f, 0.25f, 0.0f, 1.0f), "No archive is chosen");
+			}
+
+			static char txdPath[128];
+			ImGui::InputText("txd path", txdPath, 128);
+			if (ImGui::Button("Force TXD")) {
+				FSPath path = FSPath(dvdroot) / txdPath;
+				openTXD(path);
 			}
 		}
 
@@ -440,6 +511,9 @@ private:
 		}
 		ImGui::Checkbox("test window", &showTestWindow);
 		ImGui::Checkbox("panel", &showPanel);
+		if (ImGui::ColorEdit3("background", &bgColor[0])) {
+			setBackground();
+		}
 
 		if (ImGui::Button("Screenshot [F2]")) {
 			screenshotNextFrame = 1;
@@ -540,9 +614,13 @@ private:
 		bgfx::touch( 0 );
 
 		ddBegin(0);
-//		ddDrawAxis(0, 0, 0, 100.0f);
-//		float gridOrigin[3] = {floorf(camera.getPosition().x / 100) * 100, 0.0f, floorf(camera.getPosition().z / 100) * 100};
-//		ddDrawGrid(Axis::Y, gridOrigin, 200, 100.0f);
+		if (dff) {
+		ddDrawAxis(0, 0, 0, 100.0f);
+		//float gridOrigin[3] = {floorf(camera.getPosition().x / 100) * 100, 0.0f, floorf(camera.getPosition().z / 100) * 100};
+		//ddDrawGrid(Axis::Y, gridOrigin, 200, 100.0f);
+		float gridOrigin[3] = {0.0f, 0.0f, 0.0f};
+		ddDrawGrid(Axis::Y, gridOrigin, 20, 10.0f);
+		}
 		if (stage) stage->drawDebug(camera.getPosition());
 		ddEnd();
 
@@ -630,6 +708,10 @@ private:
 
 		if (stage) {
 			stage->draw(campos, txc);
+		}
+
+		if (dff) {
+			dff->draw();
 		}
 
 		if (screenshotNextFrame == 1) {

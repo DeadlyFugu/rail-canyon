@@ -117,6 +117,7 @@ Buffer ONEArchive::readFile(int index) {
 
 	Buffer b = prs_decode(data, len);
 	free(data);
+	b.seek(0);
 
 	return std::move(b);
 }

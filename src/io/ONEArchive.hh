@@ -28,6 +28,6 @@ public:
 	int getFileCount();
 	const char* getFileName(int index);
 	int findFile(const char* name);
-	virtual Buffer readFile(int file);
-	virtual Buffer readFile(const char* name);
+	Buffer readFile(int file);
+	Buffer readFile(const char* name);
 };

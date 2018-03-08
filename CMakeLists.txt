@@ -30,6 +30,8 @@ set(RAILCANYON_CC
 		src/render/Camera.cc
 		src/render/TexDictionary.cc
 		src/render/TXCAnimation.cc
+		src/render/DFFModel.cc
+		src/render/MaterialList.cc
 
 		# main
 		src/railcanyon.cc
@@ -52,6 +54,8 @@ set(RAILCANYON_HH
 		src/render/Camera.hh
 		src/render/TexDictionary.hh
 		src/render/TXCAnimation.hh
+		src/render/DFFModel.hh
+		src/render/MaterialList.hh
 
 		# main
 		src/common.hh
@@ -61,6 +65,9 @@ set(RAILCANYON_SC
 		# bspmesh
 		src/shaders/vs_bspmesh.sc
 		src/shaders/fs_bspmesh.sc
+
+		src/shaders/vs_dffmesh.sc
+		src/shaders/fs_dffmesh.sc
 )
 
 add_executable( railcanyon ${RAILCANYON_CC} ${RAILCANYON_HH} ${RAILCANYON_SC} )
@@ -69,5 +76,8 @@ target_include_directories( railcanyon PUBLIC extern/rwstreamlib/include src )
 
 add_shader( src/shaders/vs_bspmesh.sc VERTEX   OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/shaders DX11_MODEL 5_0 GLSL 130 )
 add_shader( src/shaders/fs_bspmesh.sc FRAGMENT OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/shaders DX11_MODEL 5_0 GLSL 130 )
+
+add_shader( src/shaders/vs_dffmesh.sc VERTEX   OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/shaders DX11_MODEL 5_0 GLSL 130 )
+add_shader( src/shaders/fs_dffmesh.sc FRAGMENT OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/shaders DX11_MODEL 5_0 GLSL 130 )
 
 configure_debugging( railcanyon WORKING_DIR ${CMAKE_CURRENT_BINARY_DIR} )

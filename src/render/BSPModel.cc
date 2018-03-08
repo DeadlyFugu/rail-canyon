@@ -158,22 +158,13 @@ void BSPModel::setFromWorldChunk(const char* name, const rw::WorldChunk& worldCh
 		uSamplerTexture = bgfx::createUniform("s_texture", bgfx::UniformType::Int1);
 		uMaterialColor = bgfx::createUniform("u_materialColor", bgfx::UniformType::Vec4);
 		uMaterialBits = bgfx::createUniform("u_materialBits", bgfx::UniformType::Int1);
+		bspStaticValuesLoaded = true;
 	}
 
 	setFromSection(worldChunk.rootSection);
 
-	for (auto materialChunk : worldChunk.materialList->materials) {
-		materials.emplace_back();
-		auto& mat = materials.back();
-
-		mat.color = materialChunk->color;
-		if (materialChunk->isTextured) {
-			mat.texture = txd->getTexture(materialChunk->texture->textureName.c_str());
-		} else {
-			log_info("using no texture");
-			mat.texture = bgfx::TextureHandle();
-		}
-	}
+	// set materials
+	matList = new MaterialList(worldChunk.materialList, txd);
 
 	hasData = true;
 }
@@ -186,45 +177,8 @@ void BSPModel::draw(TXCAnimation* txc) {
 				bgfx::setVertexBuffer(0, section.vertices);
 				bgfx::setIndexBuffer(mesh.indices);
 
-				// set material
-				const auto mat = materials[mesh.material];
-				//printf("%d\n", mat.texture.idx);
-				bgfx::setTexture(0, uSamplerTexture, txc ? txc->getTexture(mat.texture) : mat.texture);
-				float matColor[4];
-				uint32_t color = mat.color; // todo: is this RGBA or BGRA?
-				if (selected) color = 0xff8888ff;
-				matColor[0] = (color & 0xff) / 255.f;
-				matColor[1] = ((color >> 8) & 0xff) / 255.f;
-				matColor[2] = ((color >> 16) & 0xff) / 255.f;
-				matColor[3] = ((color >> 24) & 0xff) / 255.f;
-				//if (color != 0xffffffff)
-				//	log_info("Material with a color!!");
-				bgfx::setUniform(uMaterialColor, &matColor);
-				uint32_t matBits = 0;
-				if (renderBits & BIT_PUNCH_ALPHA)
-					matBits |= 1;
-				bgfx::setUniform(uMaterialBits, &matBits);
-
-				// set state
-				uint64_t state = BGFX_STATE_RGB_WRITE | BGFX_STATE_MSAA;
-				state |= BGFX_STATE_ALPHA_WRITE;
-
-				if (!((renderBits & BIT_ADDITIVE) || (renderBits & BIT_FULL_ALPHA)))
-					state |= BGFX_STATE_DEPTH_WRITE;
-				state |= BGFX_STATE_DEPTH_TEST_LESS;
-
-				state |= BGFX_STATE_PT_TRISTRIP;
-
-				if (renderBits & BIT_ADDITIVE) {
-					state |= BGFX_STATE_BLEND_ADD;
-				}
-				if (renderBits & BIT_FULL_ALPHA) {
-					state |= BGFX_STATE_BLEND_ALPHA | BGFX_STATE_BLEND_INDEPENDENT;
-				}
-				if (!(renderBits & BIT_NO_CULL)) {
-					state |= BGFX_STATE_CULL_CW;
-				}
-				bgfx::setState(state);
+				// set material & state
+				matList->bind(mesh.material, txc, renderBits, true);
 
 				// draw
 				bgfx::submit(0, bspProgram);
