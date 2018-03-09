@@ -287,6 +287,8 @@ private:
 		FSPath txcPath(buffer);
 		sprintf(buffer, "%s/%s_DB.bin", dvdroot, name);
 		FSPath dbPath(buffer);
+		sprintf(buffer, "%s/%sobj.one", dvdroot, name);
+		FSPath objPath(buffer);
 
 		if (!txdPath.exists()) {
 			rw::util::logger.error("missing .txd");
@@ -295,6 +297,7 @@ private:
 		} else {
 			openTXD(txdPath);
 			openBSPWorld(onePath, blkPath);
+			stage->readCache(objPath, txd);
 			stage->readLayout(dbPath);
 		}
 		if (txcPath.exists()) {
@@ -723,7 +726,7 @@ private:
 		}
 
 		if (dff) {
-			dff->draw();
+			dff->draw(glm::vec3(0,0,0), 0);
 		}
 
 		if (screenshotNextFrame == 1) {

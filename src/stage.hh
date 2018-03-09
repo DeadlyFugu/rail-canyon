@@ -68,7 +68,7 @@ private:
 public:
 	void read(FSPath& binFile);
 
-	void draw(glm::vec3 camPos);
+	void draw(glm::vec3 camPos, DFFCache* cache);
 	void drawUI(glm::vec3 camPos);
 };
 

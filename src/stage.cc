@@ -36,7 +36,7 @@ void Stage::draw(glm::vec3 camPos, TXCAnimation* txc) {
 		}
 	}
 
-	if (layout) layout->draw(camPos);
+	if (layout) layout->draw(camPos, cache);
 }
 
 void Stage::drawUI(glm::vec3 camPos) {
@@ -254,27 +254,52 @@ void ObjectLayout::read(FSPath& binFile) {
 			obj.type = swapEndianness(&instance.type);
 			obj.linkID = instance.linkID;
 			obj.radius = instance.radius;
+			swapEndianness(&instance.miscID);
 
 			auto returnOffs = b.tell();
 			b.seek(0x18000u + 0x24 * instance.miscID + 0x04);
 			if (b.tell() < b.size())
-				b.read(&obj.misc);
+				b.read(obj.misc, 32);
+			else
+				log_warn("Invalid miscID for object %d", i);
 			b.seek(returnOffs);
 		}
 	}
 }
 
-void ObjectLayout::draw(glm::vec3 camPos) {
+void ObjectLayout::draw(glm::vec3 camPos, DFFCache* cache) {
 	const Aabb box = {
 			{-5, -5, -5},
 			{5, 5, 5},
 	};
 	for (auto& object : objects) {
-		ddPush();
-		ddSetTranslate(object.pos_x, object.pos_y, object.pos_z);
-		ddSetState(true, true, false);
-		ddDraw(box);
-		ddPop();
+		if (object.type == 0x0180) {
+			const char* flowerDFFNames[] = {
+					"S01_PN_HANA1_1.DFF",
+					"S01_PN_HANA1_2.DFF",
+					"S01_PN_HANA1_3.DFF",
+					"S01_PN_HANA2.DFF",
+					"S01_PN_HANA3_1.DFF",
+					"S01_PN_HANA3_2.DFF",
+					"S01_PN_HANA4_1.DFF",
+					"S01_PN_HANA4_2.DFF",
+					"S01_PN_HANA5.DFF",
+			};
+			auto model = cache->getDFF(flowerDFFNames[object.misc[0]]);
+			model->draw(glm::vec3(object.pos_x, object.pos_y, object.pos_z), BIT_PUNCH_ALPHA);
+		} else if (object.type == 0x0181) {
+			auto model = cache->getDFF("S01_ON_HATA1_1.DFF");
+			model->draw(glm::vec3(object.pos_x, object.pos_y, object.pos_z), 0);
+		} else if (object.type == 0x0182) {
+			auto model = cache->getDFF("S01_ON_SYATI.DFF");
+			model->draw(glm::vec3(object.pos_x, object.pos_y, object.pos_z), 0);
+		} else {
+			ddPush();
+			ddSetTranslate(object.pos_x, object.pos_y, object.pos_z);
+			ddSetState(true, true, false);
+			ddDraw(box);
+			ddPop();
+		}
 	}
 }
 
@@ -285,7 +310,14 @@ void ObjectLayout::drawUI(glm::vec3 camPos) {
 
 	if (obSel >= 0 && obSel < objects.size()) {
 		auto& obj = objects[obSel];
+		ImGui::Separator();
 		ImGui::Text("Type: [%02x][%02x]", obj.type >> 8, obj.type & 0xff);
 		ImGui::DragFloat3("Position", &obj.pos_x);
+
+		ImGui::Separator();
+		ImGui::Text("Misc");
+		for (int i = 0; i < 8; i++) {
+			ImGui::Text("%08x", *((u32*) &obj.misc[i*4]));
+		}
 	}
 }

@@ -23,13 +23,10 @@ private:
 	};
 
 	std::vector<Atomic> atomics;
-
-	int renderBits = 0;
-
 public:
 	~DFFModel();
 
 	void setFromClump(rw::ClumpChunk* clump, TexDictionary* txd);
 
-	void draw();
+	void draw(glm::vec3 pos, int renderBits);
 };
