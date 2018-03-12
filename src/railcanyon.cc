@@ -161,6 +161,7 @@ static int stageSelect = 0;
 static char dvdroot[512] = "D:\\Heroes\\dvdroot\0";
 static char dvdroot_out[512] = "";
 static float mouse_sensitivity;
+static float move_speed_scale;
 
 const char* getOutPath() {
 	return dvdroot_out[0] ? dvdroot_out : ".";
@@ -332,6 +333,7 @@ private:
 		strncpy(dvdroot_out, dvdroot_out_, 512);
 
 		mouse_sensitivity = config_getf("mouse_sensitivity", 0.15f);
+		move_speed_scale = config_getf("move_speed_scale", 1.00f);
 
 		// setup bgfx
 		bgfx::setDebug( BGFX_DEBUG_TEXT );
@@ -515,6 +517,11 @@ private:
 		if (ImGui::SliderFloat("mouse sensitivity", &mouse_sensitivity, 0.01f, 1.00f)) {
 			config_setf("mouse_sensitivity", mouse_sensitivity);
 		}
+
+		if (ImGui::SliderFloat("move speed scale", &move_speed_scale, 0.01f, 10.00f)) {
+			config_setf("move_speed_scale", move_speed_scale);
+		}
+
 		ImGui::Checkbox("test window", &showTestWindow);
 		ImGui::Checkbox("panel", &showPanel);
 		if (ImGui::ColorEdit3("background", &bgColor[0])) {
@@ -547,6 +554,8 @@ private:
 				inputMove *= 2.5f;
 			if (glfwGetKey(this->mWindow, GLFW_KEY_LEFT_ALT) || glfwGetKey(this->mWindow, GLFW_KEY_RIGHT_ALT))
 				inputMove *= 10.f;
+
+			inputMove *= move_speed_scale;
 			camera.inputMoveAxis(inputMove, dt);
 		}
 
