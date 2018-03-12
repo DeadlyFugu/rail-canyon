@@ -512,7 +512,7 @@ private:
 			firstResetNeeded = false;
 		}
 
-		if (ImGui::SliderFloat("mouse sensitivity", &mouse_sensitivity, 0.05f, 0.45f)) {
+		if (ImGui::SliderFloat("mouse sensitivity", &mouse_sensitivity, 0.01f, 1.00f)) {
 			config_setf("mouse_sensitivity", mouse_sensitivity);
 		}
 		ImGui::Checkbox("test window", &showTestWindow);
