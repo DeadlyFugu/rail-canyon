@@ -1,9 +1,14 @@
 #include "common.hh"
 #include "stage.hh"
 #include <../extern/bigg/deps/bgfx.cmake/bgfx/examples/common/debugdraw/debugdraw.h>
+#include "render/Camera.hh"
 
 Stage::~Stage() {
 	models.clear();
+
+	if (layout) delete layout;
+	if (cache) delete cache;
+	delete objdb;
 }
 
 void Stage::fromArchive(ONEArchive* archive, TexDictionary* txd) { // todo: unique_ptr?
@@ -36,7 +41,7 @@ void Stage::draw(glm::vec3 camPos, TXCAnimation* txc) {
 		}
 	}
 
-	if (layout) layout->draw(camPos, cache);
+	if (layout) layout->draw(camPos, cache, objdb);
 }
 
 void Stage::drawUI(glm::vec3 camPos) {
@@ -46,6 +51,14 @@ void Stage::drawUI(glm::vec3 camPos) {
 		ImGui::Checkbox("selected", &model.selected);
 		ImGui::LabelText("visible", "%s", visibilityManager.isVisible(model.getId(), camPos) ? "yes" : "no");
 		ImGui::PopID();
+	}
+
+	static char exeName[512] = "/Users/matt/Shared/Tsonic_win.exe";
+	ImGui::Text("Secret zone: (don't touch)");
+	ImGui::InputText("exe name", exeName, 512);
+	if (ImGui::Button("read exe")) {
+		objdb->readEXE(exeName);
+		objdb->writeFile("ObjectList2.ini");
 	}
 }
 
@@ -68,8 +81,13 @@ void Stage::readCache(FSPath& oneFile, TexDictionary* txd) {
 }
 
 void Stage::drawLayoutUI(glm::vec3 camPos) {
-	if (layout) layout->drawUI(camPos);
+	if (layout) layout->drawUI(camPos, objdb);
 	else ImGui::TextColored(ImVec4(1.0f, 0.25f, 0.0f, 1.0f), "No stage is loaded");
+}
+
+Stage::Stage() {
+	objdb = new ObjectList();
+	objdb->readFile("ObjectList.ini");
 }
 
 bool VisibilityManager::isVisible(int chunkId, glm::vec3 camPos) {
@@ -219,25 +237,27 @@ DFFModel* DFFCache::getDFF(const char* name) {
 	else return result->second;
 }
 
+struct InstanceData {
+	float x, y, z;
+	u32 rx, ry, rz;
+	u16 unused_1;
+	u8 team;
+	u8 must_be_odd;
+	u32 unused_2;
+	u64 unused_repeat;
+	u16 type;
+	u8 linkID;
+	u8 radius;
+	u16 unused_3;
+	u16 miscID;
+};
+
 void ObjectLayout::read(FSPath& binFile) {
 	Buffer b = binFile.read();
 	b.seek(0);
 
 	for (int i = 0; i < 2048; i++) {
-		struct {
-			float x, y, z;
-			u32 rx, ry, rz;
-			u16 unused_1;
-			u8 team;
-			u8 must_be_odd;
-			u32 unused_2;
-			u64 unused_repeat;
-			u16 type;
-			u8 linkID;
-			u8 radius;
-			u16 unused_3;
-			u16 miscID;
-		} instance;
+		InstanceData instance;
 
 		b.read(&instance);
 
@@ -248,9 +268,9 @@ void ObjectLayout::read(FSPath& binFile) {
 			obj.pos_x = swapEndianness(&instance.x);
 			obj.pos_y = swapEndianness(&instance.y);
 			obj.pos_z = swapEndianness(&instance.z);
-			obj.rot_x = swapEndianness(&instance.rx);
-			obj.rot_y = swapEndianness(&instance.ry);
-			obj.rot_z = swapEndianness(&instance.rz);
+			obj.rot_x = swapEndianness(&instance.rx) * 0.0054931641f;
+			obj.rot_y = swapEndianness(&instance.ry) * 0.0054931641f;
+			obj.rot_z = swapEndianness(&instance.rz) * 0.0054931641f;
 			obj.type = swapEndianness(&instance.type);
 			obj.linkID = instance.linkID;
 			obj.radius = instance.radius;
@@ -267,7 +287,57 @@ void ObjectLayout::read(FSPath& binFile) {
 	}
 }
 
-void ObjectLayout::draw(glm::vec3 camPos, DFFCache* cache) {
+void ObjectLayout::write(FSPath& binFile) {
+	// create buffer to hold contents
+	Buffer b(2048 * sizeof(InstanceData) + this->objects.size() * 36, true);
+
+	// write layout
+	int miscID = 0;
+	for (auto& object : this->objects) {
+		// set struct values
+		InstanceData data;
+		data.x = object.pos_x;
+		data.y = object.pos_y;
+		data.z = object.pos_z;
+		data.rx = (u32) (object.rot_x * 182.046567512);
+		data.ry = (u32) (object.rot_y * 182.046567512);
+		data.rz = (u32) (object.rot_z * 182.046567512);
+		data.unused_1 = 0;
+		data.team = 0;
+		data.must_be_odd = 9; // this should probably be editable, seems to have some meaning
+		data.unused_2 = 0;
+		data.unused_repeat = 0;
+		data.type = (u16) object.type;
+		data.linkID = object.linkID;
+		data.radius = object.radius;
+		data.unused_3 = 0;
+		data.miscID = miscID++;
+
+		// write to file
+		b.write(data);
+	}
+
+	// write misc
+	for (auto& object : this->objects) {
+		// unused header
+		u32 value = 0x00000001;
+		b.write(value);
+
+		// content
+		b.write(object.misc, 32);
+	}
+
+	// write to file
+	binFile.write(b);
+}
+
+static int clamp(int x, int low, int high) {
+	if (x < low) return low;
+	if (x > high) return high;
+	return x;
+}
+
+void ObjectLayout::draw(glm::vec3 camPos, DFFCache* cache, ObjectList* objdb) {
 	const Aabb box = {
 			{-5, -5, -5},
 			{5, 5, 5},
@@ -285,8 +355,8 @@ void ObjectLayout::draw(glm::vec3 camPos, DFFCache* cache) {
 					"S01_PN_HANA4_2.DFF",
 					"S01_PN_HANA5.DFF",
 			};
-			auto model = cache->getDFF(flowerDFFNames[object.misc[0]]);
-			model->draw(glm::vec3(object.pos_x, object.pos_y, object.pos_z), BIT_PUNCH_ALPHA);
+			auto model = cache->getDFF(flowerDFFNames[clamp(object.misc[0], 0, 8)]);
+			if (model) model->draw(glm::vec3(object.pos_x, object.pos_y, object.pos_z), BIT_PUNCH_ALPHA);
 		} else if (object.type == 0x0181) {
 			auto model = cache->getDFF("S01_ON_HATA1_1.DFF");
 			model->draw(glm::vec3(object.pos_x, object.pos_y, object.pos_z), 0);
@@ -303,21 +373,140 @@ void ObjectLayout::draw(glm::vec3 camPos, DFFCache* cache) {
 	}
 }
 
-void ObjectLayout::drawUI(glm::vec3 camPos) {
+static char* propNameCurrent(const char* p) {
+	static char buffer[32];
+	int i = 0;
+	while (i < 32 && p[i] != ';') {
+		buffer[i] = p[i];
+		i++;
+	}
+	buffer[i] = 0;
+	return buffer;
+}
+
+static const char* propNameAdvance(const char* p) {
+	const char* result = p;
+	while (*result && *result != ';') result++;
+	if (*result) result++;
+	return result;
+}
+
+static u8* align(u8* ptr, int alignment) {
+	uptr ptr_int = (uptr) ptr;
+	while (ptr_int % alignment) ptr_int++;
+	return (u8*) ptr_int;
+}
+
+Camera* getCamera();
+const char* getOutPath();
+const char* getStageFilename();
+
+void ObjectLayout::drawUI(glm::vec3 camPos, ObjectList* objdb) {
 	static int obSel = 0;
 	ImGui::Text("Layout contains %d instances", objects.size());
 	ImGui::DragInt("instance", &obSel, 1.0f, 0, objects.size() - 1);
+	if (ImGui::Button("Save")) {
+		FSPath outDVDRoot(getOutPath());
+		char filename[32];
+		snprintf(filename, 32, "%s_DB.bin", getStageFilename());
+		FSPath outPath = outDVDRoot / filename;
+		write(outPath);
+	}
 
 	if (obSel >= 0 && obSel < objects.size()) {
 		auto& obj = objects[obSel];
 		ImGui::Separator();
-		ImGui::Text("Type: [%02x][%02x]", obj.type >> 8, obj.type & 0xff);
+		auto objdata = objdb->getObjectData(obj.type >> 8, obj.type);
+		ImGui::Text("Type: [%02x][%02x] (%s)", obj.type >> 8, obj.type & 0xff, objdata ? objdata->debugName : "<unknown>");
+
+		ImGui::DragInt("Type", &obj.type, 1.0f, 0, 0xffff);
 		ImGui::DragFloat3("Position", &obj.pos_x);
+		ImGui::DragFloat3("Rotation", &obj.rot_x);
+		ImGui::InputInt("LinkID", &obj.linkID);
+		ImGui::DragInt("Radius", &obj.radius);
+
+		if (ImGui::Button("View")) {
+			auto camera = getCamera();
+			auto objpos = glm::vec3(obj.pos_x, obj.pos_y, obj.pos_z);
+			camera->setPosition(objpos + glm::vec3(200.f, 70.f, -30.f));
+			camera->lookAt(objpos);
+		}
 
 		ImGui::Separator();
 		ImGui::Text("Misc");
+		ImGui::TextDisabled("format %s", objdata && objdata->miscFormat ? objdata->miscFormat : "unknown");
+
+		if (objdata && objdata->miscFormat && objdata->miscProperties) {
+			int propertyCount = strlen(objdata->miscFormat);
+			u8* ptr = obj.misc;
+			const char* propNamePtr = objdata->miscProperties;
+
+			for (int i = 0; i < propertyCount; i++) {
+				const char* propName = propNameCurrent(propNamePtr);
+				ImGui::PushID(i);
+				switch (objdata->miscFormat[i]) {
+					case 'c':
+					case 'C': {
+						int value = *ptr;
+						if (ImGui::DragInt(propName, &value, 1.0f, 0x00, 0xff)) {
+							*ptr = (u8) value;
+						}
+						ptr += sizeof(u8);
+					}
+						break;
+					case 's':
+					case 'S': {
+						ptr = align(ptr, 2);
+						u16 value16 = *(u16*) ptr;
+						swapEndianness(&value16);
+						int value = value16;
+						if (ImGui::DragInt(propName, &value, 1.0f, 0x0000, 0xffff)) {
+							value16 = (u16) value;
+							swapEndianness(&value16);
+							*(u16*) ptr = value16;
+						}
+						ptr += sizeof(u16);
+					}
+						break;
+					case 'i':
+					case 'I': {
+						ptr = align(ptr, 4);
+						u32 value = *(u32*) ptr;
+						swapEndianness(&value);
+						if (ImGui::DragInt(propName, (i32*) &value, 1.0f)) {
+							swapEndianness(&value);
+							*(u32*) ptr = (u32) value;
+						}
+						ptr += sizeof(u32);
+					}
+						break;
+					case 'f':
+					case 'F': {
+						ptr = align(ptr, 4);
+						float value = *(float*) ptr;
+						swapEndianness(&value);
+						if (ImGui::DragFloat(propName, &value, 1.0f)) {
+							swapEndianness(&value);
+							*(float*) ptr = value;
+						}
+						ptr += sizeof(float);
+					}
+						break;
+					default: {
+						ImGui::TextColored(ImVec4(1, 0, 0, 1), "ERROR: Unknown format %c, please report",
+										   objdata->miscFormat[i]);
+					}
+				}
+				ImGui::PopID();
+
+				propNamePtr = propNameAdvance(propNamePtr);
+			}
+		} else {
+			ImGui::TextDisabled("Cannot display property editor");
+		}
+
 		for (int i = 0; i < 8; i++) {
-			ImGui::Text("%08x", *((u32*) &obj.misc[i*4]));
+			ImGui::Text("%02x%02x%02x%02x", obj.misc[i*4+0], obj.misc[i*4+1], obj.misc[i*4+2], obj.misc[i*4+3]);
 		}
 	}
 }

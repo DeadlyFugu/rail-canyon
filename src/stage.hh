@@ -7,6 +7,7 @@
 #include "render/TexDictionary.hh"
 #include "render/TXCAnimation.hh"
 #include "render/DFFModel.hh"
+#include "util/ObjectList.hh"
 
 class VisibilityManager {
 	struct VisibilityBlock {
@@ -55,21 +56,22 @@ private:
 		float pos_x;
 		float pos_y;
 		float pos_z;
-		u32 rot_x;
-		u32 rot_y;
-		u32 rot_z;
-		u16 type;
-		u8 linkID;
-		u8 radius;
+		float rot_x;
+		float rot_y;
+		float rot_z;
+		int type;
+		int linkID;
+		int radius;
 		u8 misc[32];
 	};
 
 	std::vector<ObjectInstance> objects;
 public:
 	void read(FSPath& binFile);
+	void write(FSPath& binFile);
 
-	void draw(glm::vec3 camPos, DFFCache* cache);
-	void drawUI(glm::vec3 camPos);
+	void draw(glm::vec3 camPos, DFFCache* cache, ObjectList* objdb);
+	void drawUI(glm::vec3 camPos, ObjectList* objdb);
 };
 
 class Stage {
@@ -77,7 +79,9 @@ class Stage {
 	VisibilityManager visibilityManager;
 	ObjectLayout* layout = nullptr;
 	DFFCache* cache = nullptr;
+	ObjectList* objdb = nullptr;
 public:
+	Stage();
 	~Stage();
 	void fromArchive(ONEArchive* x, TexDictionary* txd);
 	void readVisibility(FSPath& blkFile);

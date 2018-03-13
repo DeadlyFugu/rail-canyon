@@ -19,6 +19,7 @@ set(RAILCANYON_CC
 		src/util/log.cc
 		src/util/prs.cc
 		src/util/config.cc
+		src/util/ObjectList.cc
 		extern/bigg/deps/bgfx.cmake/bgfx/examples/common/debugdraw/debugdraw.cpp
 		extern/bigg/deps/bgfx.cmake/bgfx/examples/common/bounds.cpp
 
@@ -45,6 +46,7 @@ set(RAILCANYON_HH
 		src/util/prs.hh
 		src/util/types.hh
 		src/util/config.hh
+		src/util/ObjectList.hh
 
 		# io
 		src/io/ONEArchive.hh
@@ -81,3 +83,9 @@ add_shader( src/shaders/vs_dffmesh.sc VERTEX   OUTPUT ${CMAKE_CURRENT_BINARY_DIR
 add_shader( src/shaders/fs_dffmesh.sc FRAGMENT OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/shaders DX11_MODEL 5_0 GLSL 130 )
 
 configure_debugging( railcanyon WORKING_DIR ${CMAKE_CURRENT_BINARY_DIR} )
+
+add_custom_command(
+		TARGET railcanyon POST_BUILD
+		COMMAND ${CMAKE_COMMAND} -E copy
+		${CMAKE_SOURCE_DIR}/ObjectList.ini
+		${CMAKE_CURRENT_BINARY_DIR}/ObjectList.ini)

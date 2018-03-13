@@ -736,12 +736,23 @@ private:
 			screenshotNextFrame = 0;
 		}
 	}
+
+public:
+	Camera* getCamera() {
+		return &camera;
+	}
 };
+
+static RailCanyonApp app;
+
+// todo: make Camera singleton so this awkward workaround isn't needed
+Camera* getCamera() {
+	return app.getCamera();
+}
 
 #include "io/ONEArchive.hh"
 #include "chunk.hh"
 int main( int argc, char** argv ) {
-	RailCanyonApp app;
 	BgfxCallback callback;
 	return app.run( argc, argv, bgfx::RendererType::Count, 0, 0, &callback, nullptr );
 }
