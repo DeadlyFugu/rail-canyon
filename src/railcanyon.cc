@@ -12,6 +12,7 @@
 #include "render/TXCAnimation.hh"
 #include "util/config.hh"
 #include "render/DFFModel.hh"
+#include "misc/Help.h"
 
 const char* stageDisplayNames[] = {
 		"<none>",
@@ -248,6 +249,7 @@ private:
 	Camera camera;
 	float mTime = 0.0f;
 	Stage* stage = nullptr;
+	Help* help = new Help();
 	TexDictionary* txd = nullptr;
 	TXCAnimation* txc = nullptr;
 	DFFModel* dff = nullptr;
@@ -666,10 +668,11 @@ private:
 					"TXC Animations",
 					"Object Layout",
 					"DFF Cache",
+					"Help & About"
 			};
 			static int ui_select = 0;
 			ImGui::PushItemWidth(-1.0f);
-			ImGui::Combo("##uiselect", &ui_select, menus, 7);
+			ImGui::Combo("##uiselect", &ui_select, menus, 8);
 			ImGui::PopItemWidth();
 			ImGui::Separator();
 			ImGui::PushAllowKeyboardFocus(false);
@@ -712,6 +715,14 @@ private:
 					} else {
 						ImGui::TextColored(ImVec4(1.0f, 0.25f, 0.0f, 1.0f), "No stage is loaded");
 					}
+				} break;
+				/*
+				case 6: { 
+					// DFF Cache
+				} break; 
+				*/
+				case 7: {
+					help->drawUI();
 				} break;
 				default: {
 					ImGui::TextColored(ImVec4(1.0f, 0.25f, 0.0f, 1.0f), "Invalid menu selection");

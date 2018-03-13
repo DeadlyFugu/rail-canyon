@@ -21,6 +21,10 @@ set(RAILCANYON_CC
 		src/util/config.cc
 		extern/bigg/deps/bgfx.cmake/bgfx/examples/common/debugdraw/debugdraw.cpp
 		extern/bigg/deps/bgfx.cmake/bgfx/examples/common/bounds.cpp
+		
+		# misc
+		src/misc/Help.cpp
+		src/misc/imguiUtils.cpp
 
 		# io
 		src/io/ONEArchive.cc
@@ -46,6 +50,10 @@ set(RAILCANYON_HH
 		src/util/types.hh
 		src/util/config.hh
 
+		# misc
+		src/misc/Help.h
+		src/misc/imguiUtils.h
+		
 		# io
 		src/io/ONEArchive.hh
 
