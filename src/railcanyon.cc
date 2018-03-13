@@ -255,6 +255,7 @@ private:
 	bool showPanel = true;
 	int screenshotNextFrame = 0;
 	float bgColor[3];
+	int dffRenderBits = 0;
 public:
 	RailCanyonApp() : camera(glm::vec3(0.f, 100.f, 350.f), glm::vec3(0,0,0), 60, 1.f, 960000.f) {}
 private:
@@ -361,7 +362,7 @@ private:
 	}
 
 	void drawMainUI() {
-		ImGui::Text("RailCanyon v0.2");
+		ImGui::Text("RailCanyon v0.3 [pre-release]");
 
 		// dvdroot
 		static bool dvdrootExistsDirty = true;
@@ -423,7 +424,7 @@ private:
 			static std::vector<const char*> archiveDFFs;
 			static bool archiveExists = false;
 			static bool archiveExistsDirty = true;
-			static int dffSelect;
+			static int dffSelect = 0;
 			static ONEArchive* one;
 
 			if (ImGui::InputText("ONE archive", archivePath, 128)) archiveExistsDirty = true;
@@ -431,6 +432,7 @@ private:
 			if (archiveExistsDirty) {
 				archiveExistsDirty = false;
 				archiveDFFs.clear();
+				dffSelect = 0;
 				if (one) {
 					delete one;
 					one = nullptr;
@@ -452,7 +454,7 @@ private:
 				}
 			}
 
-			if (archiveExists) {
+			if (archiveExists && archiveDFFs.size() > 0) {
 				if (ImGui::Combo("dff", &dffSelect, &archiveDFFs[0], (int) archiveDFFs.size())) {
 					if (dff) delete dff;
 					dff = new DFFModel();
@@ -469,6 +471,15 @@ private:
 			if (ImGui::Button("Force TXD")) {
 				FSPath path = FSPath(dvdroot) / txdPath;
 				openTXD(path);
+			}
+
+			static char matFlags[32];
+			if (ImGui::InputText("mat flags", matFlags, 32)) {
+				dffRenderBits = 0;
+				for (char* p = matFlags; *p; p++) {
+					dffRenderBits |= matFlagFromChar(*p);
+				}
+				dffRenderBits ^= BIT_REFLECTIVE;
 			}
 		}
 
@@ -726,7 +737,7 @@ private:
 		}
 
 		if (dff) {
-			dff->draw(glm::vec3(0,0,0), 0);
+			dff->draw(glm::vec3(0,0,0), dffRenderBits);
 		}
 
 		if (screenshotNextFrame == 1) {

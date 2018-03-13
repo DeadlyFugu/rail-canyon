@@ -17,6 +17,10 @@ const int BIT_FULL_ALPHA = 1 << 6; // if A is present
 const int BIT_ADDITIVE = 1 << 7; // if K is present
 const int BIT_UNKNOWN_F = 1 << 8; // if F is present
 
+// NOTE: always xor with BIT_REFLECTIVE after using this to parse a full string to flags
+// todo: maybe just use BIT_NON_REFLECTIVE instead to avoid awkwardness?
+int matFlagFromChar(char c);
+
 class MaterialList {
 private:
 	struct Material {

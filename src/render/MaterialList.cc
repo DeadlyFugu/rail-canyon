@@ -69,3 +69,18 @@ void MaterialList::bind(int id, TXCAnimation* txc, int renderBits, bool triList)
 	bgfx::setState(state);
 
 }
+
+int matFlagFromChar(char c) {
+	switch (c) {
+	case 'N': return BIT_REFLECTIVE; break; // note: this gets inverted later
+	case 'D': return BIT_SKY; break;
+	case 'O': return BIT_OPAQUE; break;
+	case 'S': return BIT_SHADOW; break;
+	case 'W': return BIT_NO_CULL; break;
+	case 'P': return BIT_PUNCH_ALPHA; break;
+	case 'A': return BIT_FULL_ALPHA; break;
+	case 'K': return BIT_ADDITIVE; break;
+	case 'F': return BIT_UNKNOWN_F; break;
+	}
+	return 0;
+}

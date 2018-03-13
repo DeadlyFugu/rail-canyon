@@ -56,17 +56,7 @@ void BSPModel::parseName(const char* name) {
 	}
 
 	while (*p && *p != '_') {
-		switch (*p++) {
-			case 'N': renderBits |= BIT_REFLECTIVE; break; // note: this gets inverted later
-			case 'D': renderBits |= BIT_SKY; break;
-			case 'O': renderBits |= BIT_OPAQUE; break;
-			case 'S': renderBits |= BIT_SHADOW; break;
-			case 'W': renderBits |= BIT_NO_CULL; break;
-			case 'P': renderBits |= BIT_PUNCH_ALPHA; break;
-			case 'A': renderBits |= BIT_FULL_ALPHA; break;
-			case 'K': renderBits |= BIT_ADDITIVE; break;
-			case 'F': renderBits |= BIT_UNKNOWN_F; break;
-		}
+		renderBits |= matFlagFromChar(*p++);
 	}
 	// invert reflective bit; as reflective bit is actually indicated by lack of 'N' in material flags
 	renderBits ^= BIT_REFLECTIVE;
