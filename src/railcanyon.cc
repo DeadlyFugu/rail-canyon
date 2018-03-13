@@ -12,6 +12,7 @@
 #include "render/TXCAnimation.hh"
 #include "util/config.hh"
 #include "render/DFFModel.hh"
+#include "misc/Help.h"
 
 const char* stageDisplayNames[] = {
 		"<none>",
@@ -161,6 +162,7 @@ static int stageSelect = 0;
 static char dvdroot[512] = "D:\\Heroes\\dvdroot\0";
 static char dvdroot_out[512] = "";
 static float mouse_sensitivity;
+static float move_speed_scale;
 
 const char* getOutPath() {
 	return dvdroot_out[0] ? dvdroot_out : ".";
@@ -247,6 +249,7 @@ private:
 	Camera camera;
 	float mTime = 0.0f;
 	Stage* stage = nullptr;
+	Help* help = new Help();
 	TexDictionary* txd = nullptr;
 	TXCAnimation* txc = nullptr;
 	DFFModel* dff = nullptr;
@@ -333,6 +336,7 @@ private:
 		strncpy(dvdroot_out, dvdroot_out_, 512);
 
 		mouse_sensitivity = config_getf("mouse_sensitivity", 0.15f);
+		move_speed_scale = config_getf("move_speed_scale", 1.00f);
 
 		// setup bgfx
 		bgfx::setDebug( BGFX_DEBUG_TEXT );
@@ -523,9 +527,14 @@ private:
 			firstResetNeeded = false;
 		}
 
-		if (ImGui::SliderFloat("mouse sensitivity", &mouse_sensitivity, 0.05f, 0.45f)) {
+		if (ImGui::SliderFloat("mouse sensitivity", &mouse_sensitivity, 0.01f, 1.00f)) {
 			config_setf("mouse_sensitivity", mouse_sensitivity);
 		}
+
+		if (ImGui::SliderFloat("move speed scale", &move_speed_scale, 0.01f, 10.00f)) {
+			config_setf("move_speed_scale", move_speed_scale);
+		}
+
 		ImGui::Checkbox("test window", &showTestWindow);
 		ImGui::Checkbox("panel", &showPanel);
 		if (ImGui::ColorEdit3("background", &bgColor[0])) {
@@ -558,6 +567,8 @@ private:
 				inputMove *= 2.5f;
 			if (glfwGetKey(this->mWindow, GLFW_KEY_LEFT_ALT) || glfwGetKey(this->mWindow, GLFW_KEY_RIGHT_ALT))
 				inputMove *= 10.f;
+
+			inputMove *= move_speed_scale;
 			camera.inputMoveAxis(inputMove, dt);
 		}
 
@@ -668,10 +679,11 @@ private:
 					"TXC Animations",
 					"Object Layout",
 					"DFF Cache",
+					"Help & About"
 			};
 			static int ui_select = 0;
 			ImGui::PushItemWidth(-1.0f);
-			ImGui::Combo("##uiselect", &ui_select, menus, 7);
+			ImGui::Combo("##uiselect", &ui_select, menus, 8);
 			ImGui::PopItemWidth();
 			ImGui::Separator();
 			ImGui::PushAllowKeyboardFocus(false);
@@ -714,6 +726,14 @@ private:
 					} else {
 						ImGui::TextColored(ImVec4(1.0f, 0.25f, 0.0f, 1.0f), "No stage is loaded");
 					}
+				} break;
+				/*
+				case 6: { 
+					// DFF Cache
+				} break; 
+				*/
+				case 7: {
+					help->drawUI();
 				} break;
 				default: {
 					ImGui::TextColored(ImVec4(1.0f, 0.25f, 0.0f, 1.0f), "Invalid menu selection");
