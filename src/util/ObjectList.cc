@@ -58,6 +58,7 @@ void ObjectList::readFile(const char* file) {
 			char* end = p;
 			if (*end) {
 				--end; // if not null terminator, move back one to the newline char
+				if (end > begin && *(end-1) == '\r') end--; // if on windows, move back to CR
 				*end = 0; // and make it a null terminator
 			}
 

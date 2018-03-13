@@ -376,7 +376,7 @@ void ObjectLayout::draw(glm::vec3 camPos, DFFCache* cache, ObjectList* objdb) {
 static char* propNameCurrent(const char* p) {
 	static char buffer[32];
 	int i = 0;
-	while (i < 32 && p[i] != ';') {
+	while (i < 32 && p[i] && p[i] != ';') {
 		buffer[i] = p[i];
 		i++;
 	}
