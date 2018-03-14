@@ -266,8 +266,8 @@ private:
 		FSPath txdPath(path);
 		Buffer sk_x = txdPath.read();
 		rw::Chunk* root = rw::readChunk(sk_x);
-		root->dump(rw::util::DumpWriter());
 		txd = new TexDictionary((rw::TextureDictionary*) root);
+		delete root;
 	}
 
 	void openBSPWorld(FSPath& onePath, FSPath& blkPath) {
@@ -465,6 +465,7 @@ private:
 					Buffer b = one->readFile(archiveDFFs[dffSelect]);
 					rw::ClumpChunk* clump = (rw::ClumpChunk*) rw::readChunk(b);
 					dff->setFromClump(clump, txd);
+					delete clump;
 				}
 			} else {
 				ImGui::TextColored(ImVec4(1.0f, 0.25f, 0.0f, 1.0f), "No archive is chosen");

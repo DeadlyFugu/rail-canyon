@@ -13,11 +13,6 @@ class VisibilityManager;
 
 class BSPModel {
 private:
-	struct Material {
-		uint32_t color;
-		bgfx::TextureHandle texture;
-	};
-	//std::vector<Material> materials;
 	MaterialList* matList;
 
 	struct BinMesh {

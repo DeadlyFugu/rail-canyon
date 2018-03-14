@@ -30,7 +30,13 @@ struct DFFVertex
 bgfx::VertexDecl DFFVertex::ms_decl;
 
 DFFModel::~DFFModel() {
-
+	for (auto& atomic : atomics) {
+		delete atomic.matList;
+		bgfx::destroy(atomic.vertices);
+		for (auto& submesh : atomic.subMeshes) {
+			bgfx::destroy(submesh.indices);
+		}
+	}
 }
 
 void DFFModel::setFromClump(rw::ClumpChunk* clump, TexDictionary* txd) {
@@ -62,8 +68,9 @@ void DFFModel::setFromClump(rw::ClumpChunk* clump, TexDictionary* txd) {
 			else color.as_int = 0xffffffff;
 
 			rw::geom::VertexUVs uvs;
-			if (geometry->vertexUVLayers.size()) uvs = geometry->vertexUVLayers[0][i];
-			else {
+			if (geometry->vertexUVLayers.size()) {
+				uvs = geometry->vertexUVLayers[0][i];
+			} else {
 				uvs.u = 0; uvs.v = 0;
 			}
 
@@ -72,12 +79,12 @@ void DFFModel::setFromClump(rw::ClumpChunk* clump, TexDictionary* txd) {
 					color.as_int,
 					uvs.u, uvs.v
 			};
-
-			log_info("vertex[%d] %f %f %f", i, vertex.x, vertex.y, vertex.z);
 		}
 
 		atomic.vertices = bgfx::createVertexBuffer(
-				bgfx::makeRef(meshVertices, sizeof(DFFVertex) * geometry->vertexCount),
+				bgfx::makeRef(meshVertices,
+							  sizeof(DFFVertex) * geometry->vertexCount,
+							  [](void* p, void* _) {delete[] (DFFVertex*) p;}),
 				DFFVertex::ms_decl
 		);
 
@@ -95,8 +102,6 @@ void DFFModel::setFromClump(rw::ClumpChunk* clump, TexDictionary* txd) {
 					face.vertex1, face.vertex2, face.vertex3
 			};
 			subMeshFaces[face.material].push_back(indices);
-
-			log_info("face %d %d %d", face.vertex1, face.vertex2, face.vertex3);
 		}
 
 		for (int i = 0; i < atomic.subMeshes.size(); i++) {
@@ -104,9 +109,7 @@ void DFFModel::setFromClump(rw::ClumpChunk* clump, TexDictionary* txd) {
 			auto size = sizeof(uint16_t) * subMeshFaces[i].size() * 3;
 			auto mem = bgfx::alloc(size);
 			memcpy(mem->data, &subMeshFaces[i][0], size);
-			subMesh.indices = bgfx::createIndexBuffer(
-					mem
-			);
+			subMesh.indices = bgfx::createIndexBuffer(mem);
 		}
 
 		atomic.matList = new MaterialList(geometry->materialList, txd);

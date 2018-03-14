@@ -9,12 +9,15 @@
 class TexDictionary {
 	struct TextureEntry {
 		bgfx::TextureHandle handle;
-		rw::TextureNative* textureChunk;
+		std::string name;
+		int width, height;
 	};
 	std::vector<TextureEntry> textures;
 	int listbox_item_current = 0;
 public:
+	/// load textures from rw::TextureDictionary chunk
 	TexDictionary(rw::TextureDictionary* txdChunk);
+	/// frees resources
 	~TexDictionary();
 
 	bgfx::TextureHandle getTexture(const char* name);

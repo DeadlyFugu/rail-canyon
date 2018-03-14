@@ -46,6 +46,7 @@ class DFFCache {
 private:
 	std::map<std::string, DFFModel*> cache;
 public:
+	~DFFCache();
 	void addFromArchive(FSPath& onePath, TexDictionary* txd);
 	DFFModel* getDFF(const char* name);
 };

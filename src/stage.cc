@@ -27,6 +27,8 @@ void Stage::fromArchive(ONEArchive* archive, TexDictionary* txd) { // todo: uniq
 			models.back().setFromWorldChunk(bspName, *((rw::WorldChunk*) root), txd);
 		else
 			logger.warn("Invalid BSP file in ONE archive: %s", bspName);
+
+		delete root;
 	}
 }
 
@@ -154,10 +156,6 @@ void VisibilityManager::read(FSPath& blkFile) {
 		swapEndianness((u32*) &block.high_y);
 		swapEndianness((u32*) &block.high_z);
 
-		log_info("chunk(%d)", block.chunk);
-		log_info("low(%d, %d, %d)", block.low_x, block.low_y, block.low_z);
-		log_info("high(%d, %d, %d)", block.high_x, block.high_y, block.high_z);
-
 		blocks.push_back(block);
 	}
 	if (b.remaining()) {
@@ -212,6 +210,12 @@ void VisibilityManager::drawDebug(glm::vec3 camPos) {
 	}
 }
 
+DFFCache::~DFFCache() {
+	for (auto& entry : cache) {
+		delete entry.second;
+	}
+}
+
 void DFFCache::addFromArchive(FSPath& onePath, TexDictionary* txd) {
 	ONEArchive* one = new ONEArchive(onePath);
 
@@ -225,10 +229,13 @@ void DFFCache::addFromArchive(FSPath& onePath, TexDictionary* txd) {
 			Buffer b = one->readFile(i);
 			rw::ClumpChunk* clump = (rw::ClumpChunk*) rw::readChunk(b);
 			dff->setFromClump(clump, txd);
+			delete clump;
 
 			cache[std::string(fileName)] = dff;
 		}
 	}
+
+	delete one;
 }
 
 DFFModel* DFFCache::getDFF(const char* name) {

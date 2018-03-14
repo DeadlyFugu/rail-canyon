@@ -78,6 +78,13 @@ void BSPModel::parseName(const char* name) {
 
 BSPModel::~BSPModel() {
 	clear();
+	delete matList;
+	for (auto& section : sections) {
+		bgfx::destroy(section.vertices);
+		for (auto& binmesh : section.binMeshes) {
+			bgfx::destroy(binmesh.indices);
+		}
+	}
 }
 
 void BSPModel::setFromSection(rw::AbstractSectionChunk* sectionChunk) {
@@ -104,7 +111,9 @@ void BSPModel::setFromSection(rw::AbstractSectionChunk* sectionChunk) {
 		}
 
 		section.vertices = bgfx::createVertexBuffer(
-				bgfx::makeRef(meshVertices, sizeof(BSPVertex) * vertexCount),
+				bgfx::makeRef(meshVertices,
+							  sizeof(BSPVertex) * vertexCount,
+							  [](void* p, void* _) {delete[] (BSPVertex*) p;}),
 				BSPVertex::ms_decl
 		);
 
@@ -123,7 +132,9 @@ void BSPModel::setFromSection(rw::AbstractSectionChunk* sectionChunk) {
 			section.binMeshes.emplace_back();
 
 			section.binMeshes[bmIdx].indices = bgfx::createIndexBuffer(
-					bgfx::makeRef(meshTriStrip, sizeof(uint16_t) * indexCount)
+					bgfx::makeRef(meshTriStrip,
+								  sizeof(uint16_t) * indexCount,
+								  [](void* p, void* _) {delete[] (uint16_t*) p;})
 			);
 
 			section.binMeshes[bmIdx].material = atomicSection->binMeshPLG->objects[bmIdx].material;
