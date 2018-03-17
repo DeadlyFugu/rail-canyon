@@ -129,10 +129,15 @@ void DFFModel::setFromClump(rw::ClumpChunk* clump, TexDictionary* txd) {
 }
 
 void DFFModel::draw(glm::vec3 pos, int renderBits) {
+	glm::mat4 transform;
+	transform = glm::translate(transform, pos);
+	draw(transform, renderBits);
+}
+
+void DFFModel::draw(const glm::mat4& render_transform, int renderBits) {
 	for (auto& atomic : atomics) {
 		for (auto& submesh : atomic.subMeshes) {
-			glm::mat4 transform = atomic.transform;
-			transform = glm::translate(transform, pos);
+			glm::mat4 transform = atomic.transform * render_transform;
 			bgfx::setTransform(&transform[0][0]);
 			bgfx::setVertexBuffer(0, atomic.vertices);
 			bgfx::setIndexBuffer(submesh.indices);

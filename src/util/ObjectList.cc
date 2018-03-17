@@ -51,6 +51,21 @@ void ObjectList::readFile(const char* file) {
 			advanceToNextLine(&p);
 		} else if (*p == '#') {
 			advanceToNextLine(&p);
+		} else if (!strncmp(p, "RCBegin", 7)) {
+			char* type = p + 7;
+			advanceToNextLine(&p);
+			char* block_begin = p;
+			while (strncmp(p, "RCEnd", 5)) advanceToNextLine(&p);
+			char* block_end = p;
+			advanceToNextLine(&p);
+			*block_end = 0;
+
+			if (!strncmp(type, "Draw", 4)) {
+				current->blockDraw = block_begin;
+				logger.info("DRAW BLOCK \"%s\"", block_begin);
+			} else {
+				logger.warn("Unsupported block property in %s: 'RCBegin%s'", file, type);
+			}
 		} else if (current) {
 			// get pointers to line begin and end and then null-terminate line
 			char* begin = p;

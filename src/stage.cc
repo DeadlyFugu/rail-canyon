@@ -275,9 +275,9 @@ void ObjectLayout::read(FSPath& binFile) {
 			obj.pos_x = swapEndianness(&instance.x);
 			obj.pos_y = swapEndianness(&instance.y);
 			obj.pos_z = swapEndianness(&instance.z);
-			obj.rot_x = swapEndianness(&instance.rx) * 0.0054931641f;
-			obj.rot_y = swapEndianness(&instance.ry) * 0.0054931641f;
-			obj.rot_z = swapEndianness(&instance.rz) * 0.0054931641f;
+			obj.rot_x = i32(swapEndianness(&instance.rx)) * 0.0054931641f;
+			obj.rot_y = i32(swapEndianness(&instance.ry)) * 0.0054931641f;
+			obj.rot_z = i32(swapEndianness(&instance.rz)) * 0.0054931641f;
 			obj.type = swapEndianness(&instance.type);
 			obj.linkID = instance.linkID;
 			obj.radius = instance.radius;
@@ -344,39 +344,396 @@ static int clamp(int x, int low, int high) {
 	return x;
 }
 
+extern "C" {
+#include <lua.h>
+#include <lauxlib.h>
+#include <lualib.h>
+}
+
+#include <unordered_map>
+#include <glm/gtc/matrix_transform.hpp>
+
+static bool lua_was_init = false;
+static lua_State* L;
+static std::unordered_map<int, int> object_draw_fns;
+
+struct DrawCall {
+	glm::mat4 transform;
+	int renderBits;
+	std::string modelName;
+};
+static std::vector<DrawCall> draw_calls;
+static DrawCall current_dc;
+static ObjectLayout::ObjectInstance* instance_data;
+static ObjectList::ObjectTypeData* object_data;
+static std::vector<glm::mat4> transformStack;
+
+static int rclua_draw(lua_State* L) {
+	const char* c = lua_tostring(L, -1);
+	current_dc.modelName = c ? c : "";
+	draw_calls.push_back(current_dc);
+	return 0;
+}
+
+static glm::vec3 _get_vec3(lua_State* L) {
+	glm::vec3 out;
+	lua_pushstring(L, "x");
+	lua_gettable(L, -2);
+	out.x = (float) lua_tonumber(L, -1);
+	lua_pop(L, 1);
+	lua_pushstring(L, "y");
+	lua_gettable(L, -2);
+	out.y = (float) lua_tonumber(L, -1);
+	lua_pop(L, 1);
+	lua_pushstring(L, "z");
+	lua_gettable(L, -2);
+	out.z = (float) lua_tonumber(L, -1);
+	lua_pop(L, 1);
+	return out;
+}
+
+static void _put_vec3(lua_State* L, glm::vec3 v) {
+	lua_newtable(L);
+	lua_pushstring(L, "x");
+	lua_pushnumber(L, v.x);
+	lua_settable(L, -3);
+	lua_pushstring(L, "y");
+	lua_pushnumber(L, v.y);
+	lua_settable(L, -3);
+	lua_pushstring(L, "z");
+	lua_pushnumber(L, v.z);
+	lua_settable(L, -3);
+}
+
+static int rclua_translate(lua_State* L) {
+	float fx = (float) lua_tonumber(L, -3);
+	float fy = (float) lua_tonumber(L, -2);
+	float fz = (float) lua_tonumber(L, -1);
+	current_dc.transform = glm::translate(current_dc.transform, glm::vec3(fx, fy, fz));
+	return 0;
+}
+
+static int rclua_rotate(lua_State* L) {
+	const char* format = lua_tostring(L, 1);
+	for (int i = 0; i < strlen(format); i++) {
+		glm::vec3 axis;
+		int axis_id = 0;
+		switch (format[i]) {
+			case 'x':
+			case 'X': {
+				axis = glm::vec3(1, 0, 0);
+				axis_id = 0;
+			} break;
+			case 'y':
+			case 'Y': {
+				axis = glm::vec3(0, 1, 0);
+				axis_id = 1;
+			} break;
+			case 'z':
+			case 'Z': {
+				axis = glm::vec3(0, 0, 1);
+				axis_id = 2;
+			} break;
+			default: luaL_error(L, "Invalid rotation axis %c", format[i]);
+		}
+		float f;
+		if (lua_isnumber(L, 2)) {
+			f = (float) lua_tonumber(L, i + 2); // +1 for zero indexing, +1 again to skip format arg
+		} else {
+			glm::vec3 rot = _get_vec3(L);
+			f = axis_id ? (axis_id == 1 ? rot.y : rot.z) : rot.x;
+		}
+		current_dc.transform = glm::rotate(current_dc.transform, glm::radians(f), axis);
+	}
+	return 0;
+}
+
+static int rclua_scale(lua_State* L) {
+	int argc = lua_gettop(L);
+	if (argc == 1) {
+		if (lua_isnumber(L, -1)) {
+			float factor = (float) lua_tonumber(L, -1);
+			current_dc.transform = glm::scale(current_dc.transform, glm::vec3(factor, factor, factor));
+		} else {
+			// todo: handle vec3 type
+		}
+	} else if (argc == 3) {
+		float fx = (float) lua_tonumber(L, -3);
+		float fy = (float) lua_tonumber(L, -2);
+		float fz = (float) lua_tonumber(L, -1);
+		current_dc.transform = glm::scale(current_dc.transform, glm::vec3(fx, fy, fz));
+	} else {
+		luaL_error(L, "Invalid number of arguments to scale() (got %d)", argc);
+	}
+	return 0;
+}
+
+static int rclua_push(lua_State* L) {
+	transformStack.push_back(current_dc.transform);
+	return 0;
+}
+
+static int rclua_pop(lua_State* L) {
+	current_dc.transform = transformStack.back();
+	transformStack.pop_back();
+	return 0;
+}
+
+static int rclua_material(lua_State* L) {
+	if (lua_isnumber(L, -1)) {
+		current_dc.renderBits = (int) lua_tonumber(L, -1);
+	} else {
+		const char* flags = lua_tostring(L, -1);
+		current_dc.renderBits = 0;
+		if (flags) for (const char* p = flags; *p; p++) {
+			current_dc.renderBits |= matFlagFromChar(*p);
+		}
+		current_dc.renderBits ^= BIT_REFLECTIVE;
+	}
+	return 0;
+}
+
+static int align(int i, int alignment) {
+	while (i % alignment) i++;
+	return i;
+}
+
+static int rclua_property(lua_State* L) {
+	int property = 0;
+	// get property index
+	if (lua_isnumber(L, -1)) {
+		property = (int) lua_tonumber(L, -1);
+		if (property < 1 || property > strlen(object_data->miscProperties)) {
+			luaL_error(L, "Invalid property index %d", property);
+		}
+		property--; // make 0 indexed
+	} else {
+		const char* prop_name = lua_tostring(L, -1);
+		int max_prop = (int) strlen(object_data->miscFormat);
+		const char* p = object_data->miscProperties;
+		property = -1;
+		for (int i = 0; i < max_prop; i++) {
+			int len = 0;
+			while (p[len] != ';') len++;
+			if (strlen(prop_name) == len && !strncmp(p, prop_name, len)) {
+				property = i;
+				break;
+			}
+			p += len+1;
+		}
+		if (property == -1) {
+			luaL_error(L, "No such property as %s found", prop_name);
+		}
+	}
+
+	// find offset into misc
+	int misc_offs = 0;
+	for (int i = 0; i < property; i++) {
+		switch (object_data->miscFormat[i]) {
+			case 'c':
+			case 'C': {
+				misc_offs += 1;
+			} break;
+			case 's':
+			case 'S': {
+				misc_offs = align(misc_offs, 2);
+				misc_offs += 2;
+			} break;
+			case 'x':
+			case 'X':
+			case 'i':
+			case 'I': {
+				misc_offs = align(misc_offs, 4);
+				misc_offs += 4;
+			} break;
+			case 'f':
+			case 'F': {
+				misc_offs = align(misc_offs, 4);
+				misc_offs += 4;
+			} break;
+			default: {
+				log_error("Invalid format option %c", object_data->miscFormat[i]);
+				misc_offs += 4;
+			}
+		}
+	}
+
+	switch (object_data->miscFormat[property]) {
+		case 'c':
+		case 'C': {
+			u8 value = instance_data->misc[misc_offs];
+			lua_pushnumber(L, value);
+		} break;
+		case 's':
+		case 'S': {
+			misc_offs = align(misc_offs, 2);
+			u16 value = *((u16*) &instance_data->misc[misc_offs]);
+			swapEndianness(&value);
+			lua_pushnumber(L, value);
+		} break;
+		case 'x':
+		case 'X':
+		case 'i':
+		case 'I': {
+			misc_offs = align(misc_offs, 4);
+			u32 value = *((u32*) &instance_data->misc[misc_offs]);
+			swapEndianness(&value);
+			lua_pushnumber(L, value);
+		} break;
+		case 'f':
+		case 'F': {
+			misc_offs = align(misc_offs, 4);
+			float value = *((float*) (instance_data->misc+misc_offs));
+			swapEndianness(&value);
+			lua_pushnumber(L, value);
+		} break;
+		default: {
+			log_error("Invalid format option %c", object_data->miscFormat[property]);
+			lua_pushnil(L);
+		}
+	}
+
+	return 1;
+}
+
+static int rclua_rotation(lua_State* L) {
+	_put_vec3(L, glm::vec3(instance_data->rot_x, instance_data->rot_y, instance_data->rot_z));
+	return 1;
+}
+
+static void register_fn(lua_State* L, int (*fn)(lua_State*), const char* name) {
+	lua_pushcfunction(L, fn);
+	lua_setglobal(L, name);
+}
+
+void ObjectLayout::buildObjectCache(ObjectInstance& object, DFFCache* cache, ObjectList* objdb, int id) {
+	// lazy initialize lua state
+	if (!lua_was_init) {
+		// setup lua interpreter
+		L = luaL_newstate();
+		luaL_openlibs(L);
+
+		// setup rclua functions
+		register_fn(L, rclua_draw, "draw");
+		register_fn(L, rclua_translate, "translate");
+		register_fn(L, rclua_rotate, "rotate");
+		register_fn(L, rclua_scale, "scale");
+		register_fn(L, rclua_push, "push");
+		register_fn(L, rclua_pop, "pop");
+		register_fn(L, rclua_material, "material");
+		register_fn(L, rclua_property, "property");
+		register_fn(L, rclua_rotation, "rotation");
+
+		// mark lua as loaded
+		lua_was_init = true;
+	}
+
+	// find object data from ObjectList.ini
+	auto objdata = objdb->getObjectData(u8(object.type >> 8), u8(object.type & 0xff));
+
+	// get reference to chunk
+	auto mapIterator = object_draw_fns.find(object.type);
+	int draw_fn;
+	if (mapIterator == object_draw_fns.end()) {
+		// determine chunk name
+		char buffer[32];
+		snprintf(buffer, 32, "%s(%d)::Draw", objdata->debugName, id);
+
+		// get chunk source
+		const char* src;
+		src = objdata->blockDraw;
+
+		if (src) {
+			// compile and get reference
+			luaL_loadbuffer(L, src, strlen(src), buffer);
+			draw_fn = luaL_ref(L, LUA_REGISTRYINDEX);
+		} else {
+			// indicate that this object has no source
+			draw_fn = LUA_NOREF;
+		}
+
+		// store cached value
+		object_draw_fns[object.type] = draw_fn;
+	} else {
+		// get value from object_draw_fns cache
+		draw_fn = mapIterator->second;
+	}
+
+	// set object as debug cube if lacking draw function
+	if (draw_fn == LUA_NOREF) {
+		object.fallback_render = true;
+		return;
+	}
+
+	// setup globals
+	current_dc.transform = mat4();
+	current_dc.renderBits = 0;
+	current_dc.modelName = "";
+	instance_data = &object;
+	object_data = objdata;
+	draw_calls.clear();
+
+	// execute chunk
+	lua_rawgeti(L, LUA_REGISTRYINDEX, draw_fn);
+	int result = lua_pcall(L, 0, 0, 0);
+
+	// check for errors
+	if (result) {
+		auto err = lua_tostring(L, -1);
+		log_error("INTERNAL LUA ERROR: %s", err);
+		lua_pop(L, 1);
+		draw_calls.clear();
+		object.fallback_render = true;
+	} else {
+		log_info("LUA OK");
+	}
+
+	// set object cache
+	for (auto& draw_call : draw_calls) {
+		object.cache.emplace_back();
+		auto& cacheModel = object.cache.back();
+		cacheModel.transform = draw_call.transform;
+		cacheModel.renderBits = draw_call.renderBits;
+		cacheModel.model = cache->getDFF(draw_call.modelName.c_str());
+	}
+}
+
 void ObjectLayout::draw(glm::vec3 camPos, DFFCache* cache, ObjectList* objdb) {
 	const Aabb box = {
 			{-5, -5, -5},
 			{5, 5, 5},
 	};
+	int id = 0;
 	for (auto& object : objects) {
-		if (object.type == 0x0180) {
-			const char* flowerDFFNames[] = {
-					"S01_PN_HANA1_1.DFF",
-					"S01_PN_HANA1_2.DFF",
-					"S01_PN_HANA1_3.DFF",
-					"S01_PN_HANA2.DFF",
-					"S01_PN_HANA3_1.DFF",
-					"S01_PN_HANA3_2.DFF",
-					"S01_PN_HANA4_1.DFF",
-					"S01_PN_HANA4_2.DFF",
-					"S01_PN_HANA5.DFF",
-			};
-			auto model = cache->getDFF(flowerDFFNames[clamp(object.misc[0], 0, 8)]);
-			if (model) model->draw(glm::vec3(object.pos_x, object.pos_y, object.pos_z), BIT_PUNCH_ALPHA);
-		} else if (object.type == 0x0181) {
-			auto model = cache->getDFF("S01_ON_HATA1_1.DFF");
-			model->draw(glm::vec3(object.pos_x, object.pos_y, object.pos_z), 0);
-		} else if (object.type == 0x0182) {
-			auto model = cache->getDFF("S01_ON_SYATI.DFF");
-			model->draw(glm::vec3(object.pos_x, object.pos_y, object.pos_z), 0);
-		} else {
+		if (object.fallback_render) {
+			// debug cube render for objects without any defined render
 			ddPush();
 			ddSetTranslate(object.pos_x, object.pos_y, object.pos_z);
 			ddSetState(true, true, false);
 			ddDraw(box);
 			ddPop();
+		} else {
+			if (object.cache_invalid) {
+				object.cache.clear();
+				buildObjectCache(object, cache, objdb, id);
+				object.cache_invalid = false;
+			}
+			for (auto& cached : object.cache) {
+				mat4 transform = cached.transform;
+				mat4 model_transform = glm::translate(glm::mat4(), glm::vec3(object.pos_x, object.pos_y, object.pos_z));
+				if (cached.model) {
+					cached.model->draw(model_transform * transform, cached.renderBits);
+				} else {
+					ddPush();
+					ddSetTransform(&transform);
+					ddSetState(true, true, false);
+					ddSetColor(0xff8888ff);
+					ddDraw(box);
+					ddPop();
+				}
+			}
 		}
+		id++;
 	}
 }
 
@@ -426,9 +783,9 @@ void ObjectLayout::drawUI(glm::vec3 camPos, ObjectList* objdb) {
 		auto objdata = objdb->getObjectData(obj.type >> 8, obj.type);
 		ImGui::Text("Type: [%02x][%02x] (%s)", obj.type >> 8, obj.type & 0xff, objdata ? objdata->debugName : "<unknown>");
 
-		ImGui::DragInt("Type", &obj.type, 1.0f, 0, 0xffff);
-		ImGui::DragFloat3("Position", &obj.pos_x);
-		ImGui::DragFloat3("Rotation", &obj.rot_x);
+		if (ImGui::DragInt("Type", &obj.type, 1.0f, 0, 0xffff)) obj.cache_invalid = true;
+		if (ImGui::DragFloat3("Position", &obj.pos_x)) obj.cache_invalid = true;
+		if (ImGui::DragFloat3("Rotation", &obj.rot_x)) obj.cache_invalid = true;
 		ImGui::InputInt("LinkID", &obj.linkID);
 		ImGui::DragInt("Radius", &obj.radius);
 
@@ -457,6 +814,7 @@ void ObjectLayout::drawUI(glm::vec3 camPos, ObjectList* objdb) {
 						int value = *ptr;
 						if (ImGui::DragInt(propName, &value, 1.0f, 0x00, 0xff)) {
 							*ptr = (u8) value;
+							obj.cache_invalid = true;
 						}
 						ptr += sizeof(u8);
 					}
@@ -471,10 +829,13 @@ void ObjectLayout::drawUI(glm::vec3 camPos, ObjectList* objdb) {
 							value16 = (u16) value;
 							swapEndianness(&value16);
 							*(u16*) ptr = value16;
+							obj.cache_invalid = true;
 						}
 						ptr += sizeof(u16);
 					}
 						break;
+					case 'x':
+					case 'X':
 					case 'i':
 					case 'I': {
 						ptr = align(ptr, 4);
@@ -483,6 +844,7 @@ void ObjectLayout::drawUI(glm::vec3 camPos, ObjectList* objdb) {
 						if (ImGui::DragInt(propName, (i32*) &value, 1.0f)) {
 							swapEndianness(&value);
 							*(u32*) ptr = (u32) value;
+							obj.cache_invalid = true;
 						}
 						ptr += sizeof(u32);
 					}
@@ -495,6 +857,7 @@ void ObjectLayout::drawUI(glm::vec3 camPos, ObjectList* objdb) {
 						if (ImGui::DragFloat(propName, &value, 1.0f)) {
 							swapEndianness(&value);
 							*(float*) ptr = value;
+							obj.cache_invalid = true;
 						}
 						ptr += sizeof(float);
 					}

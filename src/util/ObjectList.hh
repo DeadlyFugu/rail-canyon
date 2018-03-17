@@ -14,6 +14,7 @@ public:
 		const char* rotation = nullptr;
 		const char* miscFormat = nullptr;
 		const char* miscProperties = nullptr;
+		const char* blockDraw = nullptr;
 	};
 
 	Buffer data;

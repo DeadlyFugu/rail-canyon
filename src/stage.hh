@@ -52,7 +52,12 @@ public:
 };
 
 class ObjectLayout {
-private:
+public:
+	struct CachedModel {
+		glm::mat4 transform;
+		DFFModel* model;
+		int renderBits;
+	};
 	struct ObjectInstance {
 		float pos_x;
 		float pos_y;
@@ -64,9 +69,13 @@ private:
 		int linkID;
 		int radius;
 		u8 misc[32];
+		bool cache_invalid = true;
+		bool fallback_render = false;
+		std::vector<CachedModel> cache;
 	};
-
+private:
 	std::vector<ObjectInstance> objects;
+	void buildObjectCache(ObjectInstance& object, DFFCache* cache, ObjectList* objdb, int id);
 public:
 	void read(FSPath& binFile);
 	void write(FSPath& binFile);

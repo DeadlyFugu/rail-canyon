@@ -4,3 +4,6 @@
 [submodule "extern/rwstreamlib"]
 	path = extern/rwstreamlib
 	url = https://github.com/DeadlyFugu/rwstreamlib.git
+[submodule "extern/lua"]
+	path = extern/lua
+	url = https://github.com/lua/lua.git
