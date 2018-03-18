@@ -12,13 +12,13 @@ add_definitions(-DBGFX_CONFIG_MAX_COMMAND_BUFFER_SIZE=1048576)
 add_subdirectory( extern/bigg )
 add_subdirectory( extern/rwstreamlib )
 add_library(lua STATIC
-		extern/lua/lapi.c extern/lua/lauxlib.c extern/lua/lbaselib.c extern/lua/lbitlib.c extern/lua/lcode.c
-		extern/lua/lcorolib.c extern/lua/lctype.c extern/lua/ldblib.c extern/lua/ldebug.c extern/lua/ldo.c
-		extern/lua/ldump.c extern/lua/lfunc.c extern/lua/lgc.c extern/lua/linit.c extern/lua/liolib.c
-		extern/lua/llex.c extern/lua/lmathlib.c extern/lua/lmem.c extern/lua/loadlib.c extern/lua/lobject.c
-		extern/lua/lopcodes.c extern/lua/loslib.c extern/lua/lparser.c extern/lua/lstate.c extern/lua/lstring.c
-		extern/lua/lstrlib.c extern/lua/ltable.c extern/lua/ltablib.c extern/lua/ltests.c extern/lua/ltm.c
-		extern/lua/lua.c extern/lua/lundump.c extern/lua/lutf8lib.c extern/lua/lvm.c extern/lua/lzio.c)
+		extern/lua/lapi.c extern/lua/lauxlib.c extern/lua/lbaselib.c extern/lua/lcode.c extern/lua/lcorolib.c
+		extern/lua/lctype.c extern/lua/ldblib.c extern/lua/ldebug.c extern/lua/ldo.c extern/lua/ldump.c
+		extern/lua/lfunc.c extern/lua/lgc.c extern/lua/linit.c extern/lua/liolib.c extern/lua/llex.c
+		extern/lua/lmathlib.c extern/lua/lmem.c extern/lua/loadlib.c extern/lua/lobject.c extern/lua/lopcodes.c
+		extern/lua/loslib.c extern/lua/lparser.c extern/lua/lstate.c extern/lua/lstring.c extern/lua/lstrlib.c
+		extern/lua/ltable.c extern/lua/ltablib.c extern/lua/ltests.c extern/lua/ltm.c extern/lua/lua.c
+		extern/lua/lundump.c extern/lua/lutf8lib.c extern/lua/lvm.c extern/lua/lzio.c)
 
 set(RAILCANYON_CC
 		# util

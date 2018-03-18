@@ -18,10 +18,12 @@ void ObjectList::readFile(const char* file) {
 	// read file to buffer
 	Buffer tmp = path.read();
 	// todo: add a 'transfer' method to Buffer class to move ownership of memory from one to another
+	// (NOTE: also do something about the null terminator)
 	data.setStretchy(true);
-	data.resize(tmp.size());
+	data.resize(tmp.size()+1);
 	data.setStretchy(false);
-	tmp.read(data.base_ptr(), data.size());
+	tmp.read(data.base_ptr(), tmp.size());
+	*((u8*) data.base_ptr() + tmp.size()) = 0; // null terminate copy
 
 	// pointer for parsing through text
 	char* p = (char*) data.base_ptr();
@@ -62,7 +64,6 @@ void ObjectList::readFile(const char* file) {
 
 			if (!strncmp(type, "Draw", 4)) {
 				current->blockDraw = block_begin;
-				logger.info("DRAW BLOCK \"%s\"", block_begin);
 			} else {
 				logger.warn("Unsupported block property in %s: 'RCBegin%s'", file, type);
 			}
