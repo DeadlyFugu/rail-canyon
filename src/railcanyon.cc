@@ -594,9 +594,12 @@ private:
 		ImGui::Image(img.ptr, ImVec2(128, 128));
 	}
 
-	void update( float dt ) override {
-		mTime += dt;
+	bool showUI = true;
+
+	void updateInput(float dt) {
 		const auto keyboardActive = !ImGui::GetIO().WantCaptureKeyboard;
+
+		// move camera
 		if (keyboardActive) {
 			glm::vec3 inputMove(0, 0, 0);
 			if (glfwGetKey(this->mWindow, GLFW_KEY_W))
@@ -620,6 +623,7 @@ private:
 			camera.inputMoveAxis(inputMove, dt);
 		}
 
+		// look around
 		glm::vec2 inputLook(0,0);
 		static bool mouseIsDragging;
 		static double mouseLastX;
@@ -660,11 +664,11 @@ private:
 		}
 		camera.inputLookAxis(inputLook, dt);
 
-
+		// reset camera
 		if (keyboardActive && glfwGetKey(this->mWindow, GLFW_KEY_SPACE))
 			camera.lookAt(vec3(0,0,0));
 
-		static bool showUI = true;
+		// toggle user interface
 		static bool showUIPress = false; // used to get tab as press
 		if (keyboardActive && glfwGetKey(this->mWindow, GLFW_KEY_TAB)) {
 			if (!showUIPress) {
@@ -675,6 +679,7 @@ private:
 			showUIPress = false;
 		}
 
+		// take screenshot
 		static bool screenshotPress = false; // used to get F2 as press
 		if (keyboardActive && glfwGetKey(this->mWindow, GLFW_KEY_F2)) {
 			if (!screenshotPress) {
@@ -684,28 +689,35 @@ private:
 		} else {
 			screenshotPress = false;
 		}
+	}
 
+	void update( float dt ) override {
+		mTime += dt;
+
+		// receive input
+		updateInput(dt);
+
+		// setup view
 		camera.use(0, (float) getWidth() / getHeight());
 		bgfx::setViewRect( 0, 0, 0, uint16_t( getWidth() ), uint16_t( getHeight() ) );
 		bgfx::touch( 0 );
 
+		// debug display
 		ddBegin(0);
 		if (dff) {
-		ddDrawAxis(0, 0, 0, 100.0f);
-		//float gridOrigin[3] = {floorf(camera.getPosition().x / 100) * 100, 0.0f, floorf(camera.getPosition().z / 100) * 100};
-		//ddDrawGrid(Axis::Y, gridOrigin, 200, 100.0f);
-		float gridOrigin[3] = {0.0f, 0.0f, 0.0f};
-		ddDrawGrid(Axis::Y, gridOrigin, 20, 10.0f);
+			ddDrawAxis(0, 0, 0, 100.0f);
+			float gridOrigin[3] = {0.0f, 0.0f, 0.0f};
+			ddDrawGrid(Axis::Y, gridOrigin, 20, 10.0f);
 		}
 		if (stage) stage->drawDebug(camera.getPosition());
 		ddEnd();
 
+		// show overlay
 		auto campos = camera.getPosition();
 		static bool showOverlay = true;
 		if (!showPanel) goto end_overlay;
 		ImGui::SetNextWindowPos(ImVec2(10,10));
-		if (ImGui::Begin("dispoverlay", &showOverlay, ImVec2(240,0), 0.3f, ImGuiWindowFlags_NoTitleBar|ImGuiWindowFlags_NoResize|ImGuiWindowFlags_NoMove|ImGuiWindowFlags_NoSavedSettings))
-		{
+		if (ImGui::Begin("dispoverlay", &showOverlay, ImVec2(240,0), 0.3f, ImGuiWindowFlags_NoTitleBar|ImGuiWindowFlags_NoResize|ImGuiWindowFlags_NoMove|ImGuiWindowFlags_NoSavedSettings)) {
 			ImGui::Text("Stage: %s", stageDisplayNames[stageSelect]);
 			ImGui::Separator();
 			ImGui::Text("Cam: (%.0f, %.0f, %.0f)", campos.x, campos.y, campos.z);
@@ -714,6 +726,7 @@ private:
 		ImGui::End();
 		end_overlay:
 
+		// show ui sidebar
 		if (screenshotNextFrame || !showUI) goto end_ui;
 		ImGui::SetNextWindowPos(ImVec2(10, 85));
 		static bool showSidePanel;
@@ -804,33 +817,6 @@ private:
 		double mouseX;
 		double mouseY;
 		glfwGetCursorPos(this->mWindow, &mouseX, &mouseY);
-/*
-		float mx_ndc = (((float) mouseX / getWidth()) * 2.f - 1.f);
-		float my_ndc = (((float) mouseY / getHeight()) * 2.f - 1.f);
-		mat4 mat_vp = camera.getPerspMatrix() * camera.getViewMatrix();
-		mat4 mat_inv_vp = inverse(mat_vp);
-
-		log_debug("ndc(%g, %g)", mx_ndc, my_ndc);
-
-		vec3 pick_eye = mat_inv_vp * vec4(mx_ndc, my_ndc, 0, 1);
-		//vec3 pick_at = mat_inv_vp * vec4(mx_ndc, my_ndc, 1, 1);
-		vec3 pick_at(0,0,0);
-
-		log_debug("pick_eye(%g, %g, %g)", pick_eye.x, pick_eye.y, pick_eye.z);
-		log_debug("pick_at(%g, %g, %g)", pick_at.x, pick_at.y, pick_at.z);
-
-		ddPush();
-		ddSetTranslate(0, 0, 0);
-		ddDrawAxis(pick_eye.x, pick_eye.y, pick_eye.z, 10.f, Axis::Count, 2.f);
-		ddDrawAxis(pick_at.x, pick_at.y, pick_at.z, 10.f);
-		ddPop();
-
-		mat4 pick_view = lookAt(pick_eye, pick_at, vec3(0, 1, 0));
-		mat4 pick_proj = bigg::perspective(glm::radians(90.f), 1, 0.1, 100000);
-*/
-		bgfx::setViewFrameBuffer(1, picking_fb);
-		//bgfx::setViewRect(1, 0, 0, PICK_SIZE, PICK_SIZE);
-		//bgfx::setViewTransform(1, &pick_view[0][0], &pick_proj[0][0]);
 
 		// below copied directly from https://github.com/bkaradzic/bgfx/blob/master/examples/30-picking/picking.cpp
 		// Set up picking pass
@@ -863,6 +849,7 @@ private:
 		bx::mtxProj(pickProj, 2, 1, 0.1f, 10000.0f, bgfx::getCaps()->homogeneousDepth);
 
 		// View rect and transforms for picking pass
+		bgfx::setViewFrameBuffer(1, picking_fb);
 		bgfx::setViewRect(1, 0, 0, PICK_SIZE, PICK_SIZE);
 		bgfx::setViewTransform(1, pickView, pickProj);
 
