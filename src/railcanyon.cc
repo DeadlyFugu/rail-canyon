@@ -263,8 +263,8 @@ private:
 	bgfx::FrameBufferHandle picking_fb;
 	u32 readback_frame = 0;
 	u32 current_frame = 0;
-	u8 blit_data[8 * 8 * 4];
-	const u8 PICK_SIZE = 64;
+	#define PICK_SIZE 64
+	u8 blit_data[PICK_SIZE * PICK_SIZE * 4];
 
 	bool showTestWindow = false;
 	bool showPanel = true;
@@ -592,12 +592,20 @@ private:
 		img.s.flags = 0; // unused
 		img.s.handle = picking_rt;
 		ImGui::Image(img.ptr, ImVec2(128, 128));
+		img.s.handle = blitted;
+		ImGui::Image(img.ptr, ImVec2(128, 128));
+		if (ImGui::Button("ReadBack")) {
+			bgfx::readTexture(blitted, &blit_data);
+			bgfx::frame();
+			bgfx::frame();
+		}
 	}
 
 	bool showUI = true;
 
 	void updateInput(float dt) {
 		const auto keyboardActive = !ImGui::GetIO().WantCaptureKeyboard;
+		const auto mouseActive = !ImGui::GetIO().WantCaptureMouse;
 
 		// move camera
 		if (keyboardActive) {
@@ -873,17 +881,32 @@ private:
 			readback_frame = 0;
 
 			log_info("READBACK ACHIEVED");
+			log_debug("pixel[0][0] = #%02x%02x%02x%02x", blit_data[0], blit_data[1], blit_data[2], blit_data[3]);
+
+			u16 idx = blit_data[0] | (blit_data[1] << 8);
+			u8 list = blit_data[2];
+
+			log_debug("selected %d:%d", list, idx);
+			setSelectedObject(list, idx);
 		}
 
 		// todo: ensure mouse not over UI element
 		if (!readback_frame &&
 				glfwGetMouseButton(this->mWindow, GLFW_MOUSE_BUTTON_LEFT) &&
-				bgfx::getCaps()->supported & BGFX_CAPS_TEXTURE_BLIT) {
+				(bgfx::getCaps()->supported & BGFX_CAPS_TEXTURE_BLIT) &&
+				(bgfx::getCaps()->supported & BGFX_CAPS_TEXTURE_READ_BACK) &&
+				!ImGui::GetIO().WantCaptureMouse && txd) {
 			bgfx::blit(2, blitted, 0, 0, picking_rt);
+			bgfx::frame();
+			bgfx::frame();
 			bgfx::readTexture(blitted, blit_data);
+			bgfx::frame();
+			bgfx::frame();
 			readback_frame = current_frame + 10;
 			// todo: very sketchy; workaround as cannot get actual current frame due to BIGG's design
 		}
+
+		current_frame++;
 	}
 
 public:

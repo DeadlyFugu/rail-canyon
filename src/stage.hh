@@ -84,6 +84,8 @@ public:
 	void drawUI(glm::vec3 camPos, ObjectList* objdb);
 };
 
+void setSelectedObject(int list, int ob);
+
 class Stage {
 	std::list<BSPModel> models;
 	VisibilityManager visibilityManager;

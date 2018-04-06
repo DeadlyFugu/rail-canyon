@@ -98,8 +98,16 @@ void Stage::readCache(FSPath& oneFile, TexDictionary* txd) {
 	cache->addFromArchive(oneFile, txd);
 }
 
+static int listSel = 1;
+
 void Stage::drawLayoutUI(glm::vec3 camPos) {
-	if (layout_db) layout_db->drawUI(camPos, objdb);
+	ImGui::Combo("Layout", &listSel, "None\0DB\0P1\0");
+	if (listSel == 1) {
+		if (layout_db) layout_db->drawUI(camPos, objdb);
+	} else if (listSel == 2) {
+		if (layout_p1) layout_p1->drawUI(camPos, objdb);
+	}
+
 	// todo: choose layout
 	else ImGui::TextColored(ImVec4(1.0f, 0.25f, 0.0f, 1.0f), "No stage is loaded");
 }
@@ -783,9 +791,14 @@ static u8* align(u8* ptr, int alignment) {
 Camera* getCamera();
 const char* getOutPath();
 const char* getStageFilename();
+static int obSel = 0;
+
+void setSelectedObject(int list, int ob) {
+	listSel = list;
+	obSel = ob;
+}
 
 void ObjectLayout::drawUI(glm::vec3 camPos, ObjectList* objdb) {
-	static int obSel = 0;
 	ImGui::Text("Layout contains %d instances", objects.size());
 	ImGui::DragInt("instance", &obSel, 1.0f, 0, objects.size() - 1);
 	if (ImGui::Button("Save")) {
