@@ -176,6 +176,8 @@ const char* getStageFilename() {
 #include <bx/file.h>
 #include <bx/debug.h>
 #include <bimg/bimg.h>
+#include <bx/math.h>
+
 static void savePNG(const char* _filePath, uint32_t _width, uint32_t _height, uint32_t _srcPitch, const void* _src, bool _grayscale, bool _yflip) {
 	bx::FileWriter writer;
 	bx::Error err;
@@ -251,8 +253,18 @@ private:
 	Stage* stage = nullptr;
 	Help* help = new Help();
 	TexDictionary* txd = nullptr;
+	TexDictionary* txd_common = nullptr;
 	TXCAnimation* txc = nullptr;
 	DFFModel* dff = nullptr;
+
+	bgfx::TextureHandle picking_rt;
+	bgfx::TextureHandle picking_rt_depth;
+	bgfx::TextureHandle blitted;
+	bgfx::FrameBufferHandle picking_fb;
+	u32 readback_frame = 0;
+	u32 current_frame = 0;
+	u8 blit_data[8 * 8 * 4];
+	const u8 PICK_SIZE = 64;
 
 	bool showTestWindow = false;
 	bool showPanel = true;
@@ -270,6 +282,14 @@ private:
 		delete root;
 	}
 
+	void openCommonTXD(const FSPath& path) {
+		FSPath txdPath(path);
+		Buffer sk_x = txdPath.read();
+		rw::Chunk* root = rw::readChunk(sk_x);
+		txd_common = new TexDictionary((rw::TextureDictionary*) root);
+		delete root;
+	}
+
 	void openBSPWorld(FSPath& onePath, FSPath& blkPath) {
 		// read BSPs
 		ONEArchive archive(onePath);
@@ -283,16 +303,18 @@ private:
 		char buffer[512];
 		sprintf(buffer, "%s/textures/%s.txd", dvdroot, name);
 		FSPath txdPath(buffer);
+		sprintf(buffer, "%s/textures/obj_common.txd", dvdroot);
+		FSPath txdCmnPath(buffer);
 		sprintf(buffer, "%s/%s.one", dvdroot, name);
 		FSPath onePath(buffer);
 		sprintf(buffer, "%s/%s_blk.bin", dvdroot, name);
 		FSPath blkPath(buffer);
 		sprintf(buffer, "%s/%s.txc", dvdroot, name);
 		FSPath txcPath(buffer);
-		sprintf(buffer, "%s/%s_DB.bin", dvdroot, name);
-		FSPath dbPath(buffer);
 		sprintf(buffer, "%s/%sobj.one", dvdroot, name);
 		FSPath objPath(buffer);
+		sprintf(buffer, "%s/comobj.one", dvdroot);
+		FSPath cmnPath(buffer);
 
 		if (!txdPath.exists()) {
 			rw::util::logger.error("missing .txd");
@@ -300,9 +322,11 @@ private:
 			rw::util::logger.error("missing .one");
 		} else {
 			openTXD(txdPath);
+			openCommonTXD(txdCmnPath);
 			openBSPWorld(onePath, blkPath);
 			stage->readCache(objPath, txd);
-			stage->readLayout(dbPath);
+			stage->readCache(cmnPath, txd_common);
+			stage->readLayout(dvdroot, name);
 		}
 		if (txcPath.exists()) {
 			auto b = txcPath.read();
@@ -344,6 +368,22 @@ private:
 		reset(BGFX_RESET_VSYNC);
 
 		ddInit();
+
+		// setup picking framebuffer
+		auto tex_flags = BGFX_TEXTURE_MIN_POINT
+					   | BGFX_TEXTURE_MAG_POINT
+					   | BGFX_TEXTURE_MIP_POINT
+					   | BGFX_TEXTURE_U_CLAMP
+					   | BGFX_TEXTURE_V_CLAMP;
+
+		using bgfx::TextureFormat;
+		picking_rt = bgfx::createTexture2D(PICK_SIZE, PICK_SIZE, false, 1, TextureFormat::RGBA8, tex_flags | BGFX_TEXTURE_RT);
+		picking_rt_depth = bgfx::createTexture2D(PICK_SIZE, PICK_SIZE, false, 1, TextureFormat::D24S8, tex_flags | BGFX_TEXTURE_RT);
+		blitted = bgfx::createTexture2D(PICK_SIZE, PICK_SIZE, false, 1, TextureFormat::RGBA8,
+										tex_flags | BGFX_TEXTURE_BLIT_DST | BGFX_TEXTURE_READ_BACK);
+
+		bgfx::TextureHandle targets[] = {picking_rt, picking_rt_depth};
+		picking_fb = bgfx::createFrameBuffer(2, targets, true);
 	}
 
 	int shutdown() override {
@@ -357,7 +397,8 @@ private:
 		color |= uint8_t(bgColor[0] * 255.f) << 24;
 		color |= uint8_t(bgColor[1] * 255.f) << 16;
 		color |= uint8_t(bgColor[2] * 255.f) <<  8;
-		bgfx::setViewClear( 0, BGFX_CLEAR_COLOR | BGFX_CLEAR_DEPTH, /*0x303030ff*/ color, 1.0f, 0 );
+		bgfx::setViewClear(0, BGFX_CLEAR_COLOR | BGFX_CLEAR_DEPTH, /*0x303030ff*/ color, 1.0f, 0);
+		bgfx::setViewClear(1, BGFX_CLEAR_COLOR | BGFX_CLEAR_DEPTH, 0x000000ff, 1.0f, 0);
 	}
 
 	void onReset() override {
@@ -545,6 +586,12 @@ private:
 		if (ImGui::Button("Screenshot [F2]")) {
 			screenshotNextFrame = 1;
 		}
+
+		union BiggImTexture { ImTextureID ptr; struct { uint16_t flags; bgfx::TextureHandle handle; } s; };
+		BiggImTexture img;
+		img.s.flags = 0; // unused
+		img.s.handle = picking_rt;
+		ImGui::Image(img.ptr, ImVec2(128, 128));
 	}
 
 	void update( float dt ) override {
@@ -753,8 +800,75 @@ private:
 			txc->setTime(mTime);
 		}
 
+		// calculate picking view
+		double mouseX;
+		double mouseY;
+		glfwGetCursorPos(this->mWindow, &mouseX, &mouseY);
+/*
+		float mx_ndc = (((float) mouseX / getWidth()) * 2.f - 1.f);
+		float my_ndc = (((float) mouseY / getHeight()) * 2.f - 1.f);
+		mat4 mat_vp = camera.getPerspMatrix() * camera.getViewMatrix();
+		mat4 mat_inv_vp = inverse(mat_vp);
+
+		log_debug("ndc(%g, %g)", mx_ndc, my_ndc);
+
+		vec3 pick_eye = mat_inv_vp * vec4(mx_ndc, my_ndc, 0, 1);
+		//vec3 pick_at = mat_inv_vp * vec4(mx_ndc, my_ndc, 1, 1);
+		vec3 pick_at(0,0,0);
+
+		log_debug("pick_eye(%g, %g, %g)", pick_eye.x, pick_eye.y, pick_eye.z);
+		log_debug("pick_at(%g, %g, %g)", pick_at.x, pick_at.y, pick_at.z);
+
+		ddPush();
+		ddSetTranslate(0, 0, 0);
+		ddDrawAxis(pick_eye.x, pick_eye.y, pick_eye.z, 10.f, Axis::Count, 2.f);
+		ddDrawAxis(pick_at.x, pick_at.y, pick_at.z, 10.f);
+		ddPop();
+
+		mat4 pick_view = lookAt(pick_eye, pick_at, vec3(0, 1, 0));
+		mat4 pick_proj = bigg::perspective(glm::radians(90.f), 1, 0.1, 100000);
+*/
+		bgfx::setViewFrameBuffer(1, picking_fb);
+		//bgfx::setViewRect(1, 0, 0, PICK_SIZE, PICK_SIZE);
+		//bgfx::setViewTransform(1, &pick_view[0][0], &pick_proj[0][0]);
+
+		// below copied directly from https://github.com/bkaradzic/bgfx/blob/master/examples/30-picking/picking.cpp
+		// Set up picking pass
+		glm::mat4 view = camera.getViewMatrix();
+		glm::mat4 proj = camera.getPerspMatrix();
+		float viewProj[16];
+		bx::mtxMul(viewProj, &view[0][0], &proj[0][0]);
+
+		float invViewProj[16];
+		bx::mtxInverse(invViewProj, viewProj);
+
+		// Mouse coord in NDC
+		float mouseXNDC = ( mouseX             / (float)getWidth() ) * 2.0f - 1.0f;
+		float mouseYNDC = ((getHeight() - mouseY) / (float)getHeight()) * 2.0f - 1.0f;
+
+		float pickEye[3];
+		float mousePosNDC[3] = { mouseXNDC, mouseYNDC, 0.0f };
+		bx::vec3MulMtxH(pickEye, mousePosNDC, invViewProj);
+
+		float pickAt[3];
+		float mousePosNDCEnd[3] = { mouseXNDC, mouseYNDC, 0.1f };
+		bx::vec3MulMtxH(pickAt, mousePosNDCEnd, invViewProj);
+
+		// Look at our unprojected point
+		float pickView[16];
+		bx::mtxLookAt(pickView, pickEye, pickAt);
+
+		// Tight FOV is best for picking
+		float pickProj[16];
+		bx::mtxProj(pickProj, 2, 1, 0.1f, 10000.0f, bgfx::getCaps()->homogeneousDepth);
+
+		// View rect and transforms for picking pass
+		bgfx::setViewRect(1, 0, 0, PICK_SIZE, PICK_SIZE);
+		bgfx::setViewTransform(1, pickView, pickProj);
+
+
 		if (stage) {
-			stage->draw(campos, txc);
+			stage->draw(campos, txc, true);
 		}
 
 		if (dff) {
@@ -766,6 +880,22 @@ private:
 		} else if (screenshotNextFrame) {
 			screenshot();
 			screenshotNextFrame = 0;
+		}
+
+		if (readback_frame && readback_frame == current_frame) {
+			readback_frame = 0;
+
+			log_info("READBACK ACHIEVED");
+		}
+
+		// todo: ensure mouse not over UI element
+		if (!readback_frame &&
+				glfwGetMouseButton(this->mWindow, GLFW_MOUSE_BUTTON_LEFT) &&
+				bgfx::getCaps()->supported & BGFX_CAPS_TEXTURE_BLIT) {
+			bgfx::blit(2, blitted, 0, 0, picking_rt);
+			bgfx::readTexture(blitted, blit_data);
+			readback_frame = current_frame + 10;
+			// todo: very sketchy; workaround as cannot get actual current frame due to BIGG's design
 		}
 	}
 

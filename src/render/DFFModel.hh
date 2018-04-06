@@ -28,6 +28,6 @@ public:
 
 	void setFromClump(rw::ClumpChunk* clump, TexDictionary* txd);
 
-	void draw(glm::vec3 pos, int renderBits);
-	void draw(const glm::mat4& transform, int renderBits);
+	void draw(glm::vec3 pos, int renderBits, int pick_color = 0);
+	void draw(const glm::mat4& transform, int renderBits, int pick_color = 0);
 };

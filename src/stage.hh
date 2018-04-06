@@ -80,14 +80,15 @@ public:
 	void read(FSPath& binFile);
 	void write(FSPath& binFile);
 
-	void draw(glm::vec3 camPos, DFFCache* cache, ObjectList* objdb);
+	void draw(glm::vec3 camPos, DFFCache* cache, ObjectList* objdb, int picking);
 	void drawUI(glm::vec3 camPos, ObjectList* objdb);
 };
 
 class Stage {
 	std::list<BSPModel> models;
 	VisibilityManager visibilityManager;
-	ObjectLayout* layout = nullptr;
+	ObjectLayout* layout_db = nullptr;
+	ObjectLayout* layout_p1 = nullptr;
 	DFFCache* cache = nullptr;
 	ObjectList* objdb = nullptr;
 public:
@@ -95,8 +96,8 @@ public:
 	~Stage();
 	void fromArchive(ONEArchive* x, TexDictionary* txd);
 	void readVisibility(FSPath& blkFile);
-	void readLayout(FSPath& binFile);
-	void draw(glm::vec3 camPos, TXCAnimation* txc);
+	void readLayout(const char* dvdroot, const char* stgname);
+	void draw(glm::vec3 camPos, TXCAnimation* txc, bool picking);
 	void drawUI(glm::vec3 camPos);
 	void drawVisibilityUI(glm::vec3 camPos);
 	void drawLayoutUI(glm::vec3 camPos);

@@ -6,7 +6,8 @@
 Stage::~Stage() {
 	models.clear();
 
-	if (layout) delete layout;
+	if (layout_db) delete layout_db;
+	if (layout_p1) delete layout_p1;
 	if (cache) delete cache;
 	delete objdb;
 }
@@ -36,14 +37,20 @@ void Stage::readVisibility(FSPath& blkFile) {
 	visibilityManager.read(blkFile);
 }
 
-void Stage::draw(glm::vec3 camPos, TXCAnimation* txc) {
+void Stage::draw(glm::vec3 camPos, TXCAnimation* txc, bool picking) {
 	for (auto& model : models) {
 		if (visibilityManager.isVisible(model.getId(), camPos)) {
 			model.draw(txc);
 		}
 	}
 
-	if (layout) layout->draw(camPos, cache, objdb);
+	if (layout_db) layout_db->draw(camPos, cache, objdb, 0);
+	if (layout_p1) layout_p1->draw(camPos, cache, objdb, 0);
+
+	if (picking) {
+		if (layout_db) layout_db->draw(camPos, cache, objdb, 1);
+		if (layout_p1) layout_p1->draw(camPos, cache, objdb, 2);
+	}
 }
 
 void Stage::drawUI(glm::vec3 camPos) {
@@ -72,9 +79,18 @@ void Stage::drawDebug(glm::vec3 camPos) {
 	visibilityManager.drawDebug(camPos);
 }
 
-void Stage::readLayout(FSPath& binFile) {
-	layout = new ObjectLayout();
-	layout->read(binFile);
+void Stage::readLayout(const char* dvdroot, const char* stgname) {
+	char buffer[512];
+
+	sprintf(buffer, "%s/%s_DB.bin", dvdroot, stgname);
+	FSPath path_db(buffer);
+	layout_db = new ObjectLayout();
+	layout_db->read(path_db);
+
+	sprintf(buffer, "%s/%s_P1.bin", dvdroot, stgname);
+	FSPath path_p1(buffer);
+	layout_p1 = new ObjectLayout();
+	layout_p1->read(path_p1);
 }
 
 void Stage::readCache(FSPath& oneFile, TexDictionary* txd) {
@@ -83,7 +99,8 @@ void Stage::readCache(FSPath& oneFile, TexDictionary* txd) {
 }
 
 void Stage::drawLayoutUI(glm::vec3 camPos) {
-	if (layout) layout->drawUI(camPos, objdb);
+	if (layout_db) layout_db->drawUI(camPos, objdb);
+	// todo: choose layout
 	else ImGui::TextColored(ImVec4(1.0f, 0.25f, 0.0f, 1.0f), "No stage is loaded");
 }
 
@@ -698,18 +715,20 @@ void ObjectLayout::buildObjectCache(ObjectInstance& object, DFFCache* cache, Obj
 	}
 }
 
-void ObjectLayout::draw(glm::vec3 camPos, DFFCache* cache, ObjectList* objdb) {
+void ObjectLayout::draw(glm::vec3 camPos, DFFCache* cache, ObjectList* objdb, int picking) {
 	const Aabb box = {
 			{-5, -5, -5},
 			{5, 5, 5},
 	};
 	int id = 0;
 	for (auto& object : objects) {
+		u32 pick_color = (u8(picking) << 16) | (u16(id));
 		if (object.fallback_render) {
 			// debug cube render for objects without any defined render
 			ddPush();
 			ddSetTranslate(object.pos_x, object.pos_y, object.pos_z);
 			ddSetState(true, true, false);
+			if (picking) ddSetColor(pick_color | 0xff000000);
 			ddDraw(box);
 			ddPop();
 		} else {
@@ -722,12 +741,12 @@ void ObjectLayout::draw(glm::vec3 camPos, DFFCache* cache, ObjectList* objdb) {
 				mat4 transform = cached.transform;
 				mat4 model_transform = glm::translate(glm::mat4(), glm::vec3(object.pos_x, object.pos_y, object.pos_z));
 				if (cached.model) {
-					cached.model->draw(model_transform * transform, cached.renderBits);
+					cached.model->draw(model_transform * transform, cached.renderBits, picking ? pick_color : 0);
 				} else {
 					ddPush();
 					ddSetTransform(&transform);
 					ddSetState(true, true, false);
-					ddSetColor(0xff8888ff);
+					ddSetColor(picking ? (pick_color | 0xff000000) : 0xff8888ff);
 					ddDraw(box);
 					ddPop();
 				}

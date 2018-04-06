@@ -128,13 +128,13 @@ void DFFModel::setFromClump(rw::ClumpChunk* clump, TexDictionary* txd) {
 	}
 }
 
-void DFFModel::draw(glm::vec3 pos, int renderBits) {
+void DFFModel::draw(glm::vec3 pos, int renderBits, int pick_color) {
 	glm::mat4 transform;
 	transform = glm::translate(transform, pos);
-	draw(transform, renderBits);
+	draw(transform, renderBits, pick_color);
 }
 
-void DFFModel::draw(const glm::mat4& render_transform, int renderBits) {
+void DFFModel::draw(const glm::mat4& render_transform, int renderBits, int pick_color) {
 	for (auto& atomic : atomics) {
 		for (auto& submesh : atomic.subMeshes) {
 			glm::mat4 transform = atomic.transform * render_transform;
@@ -142,9 +142,13 @@ void DFFModel::draw(const glm::mat4& render_transform, int renderBits) {
 			bgfx::setVertexBuffer(0, atomic.vertices);
 			bgfx::setIndexBuffer(submesh.indices);
 
-			atomic.matList->bind(submesh.material, nullptr, renderBits, false);
+			if (pick_color) {
+				atomic.matList->bind_color(pick_color, false);
+			} else {
+				atomic.matList->bind(submesh.material, nullptr, renderBits, false);
+			}
 
-			bgfx::submit(0, dffProgram);
+			bgfx::submit(pick_color ? u8(1) : u8(0), dffProgram);
 		}
 	}
 }
