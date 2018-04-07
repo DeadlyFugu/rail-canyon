@@ -90,6 +90,7 @@ class Stage {
 	std::list<BSPModel> models;
 	VisibilityManager visibilityManager;
 	ObjectLayout* layout_db = nullptr;
+	ObjectLayout* layout_pb = nullptr;
 	ObjectLayout* layout_p1 = nullptr;
 	DFFCache* cache = nullptr;
 	ObjectList* objdb = nullptr;

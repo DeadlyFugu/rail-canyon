@@ -12,5 +12,5 @@ This project uses CMake for building. All dependencies are included in repositor
 git clone --recursive https://github.com/DeadlyFugu/rail-canyon
 mkdir build
 cd build
-cmake ...
+cmake ..
 ```

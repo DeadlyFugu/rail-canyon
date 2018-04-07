@@ -327,10 +327,11 @@ private:
 			stage->readCache(objPath, txd);
 			stage->readCache(cmnPath, txd_common);
 			stage->readLayout(dvdroot, name);
-		}
-		if (txcPath.exists()) {
-			auto b = txcPath.read();
-			txc = new TXCAnimation(b, txd);
+
+			if (txcPath.exists()) {
+				auto b = txcPath.read();
+				txc = new TXCAnimation(b, txd);
+			}
 		}
 	}
 

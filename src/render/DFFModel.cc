@@ -119,7 +119,7 @@ void DFFModel::setFromClump(rw::ClumpChunk* clump, TexDictionary* txd) {
 		atomic.matList = new MaterialList(geometry->materialList, txd);
 
 		auto& frame = clump->frameList->frames[atomicChunk->frameIndex];
-		glm::translate(atomic.transform, glm::vec3(frame.translation.x, frame.translation.y, frame.translation.z));
+		atomic.transform = glm::translate(atomic.transform, glm::vec3(frame.translation.x, frame.translation.y, frame.translation.z));
 		atomic.transform[0][0] = frame.rotation.row1.x;
 		atomic.transform[0][1] = frame.rotation.row1.y;
 		atomic.transform[0][2] = frame.rotation.row1.z;
@@ -141,7 +141,7 @@ void DFFModel::draw(glm::vec3 pos, int renderBits, int pick_color) {
 void DFFModel::draw(const glm::mat4& render_transform, int renderBits, int pick_color) {
 	for (auto& atomic : atomics) {
 		for (auto& submesh : atomic.subMeshes) {
-			glm::mat4 transform = atomic.transform * render_transform;
+			glm::mat4 transform = render_transform * atomic.transform;
 			bgfx::setTransform(&transform[0][0]);
 			bgfx::setVertexBuffer(0, atomic.vertices);
 			bgfx::setIndexBuffer(submesh.indices);

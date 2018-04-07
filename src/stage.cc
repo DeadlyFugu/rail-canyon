@@ -7,6 +7,7 @@ Stage::~Stage() {
 	models.clear();
 
 	if (layout_db) delete layout_db;
+	if (layout_pb) delete layout_pb;
 	if (layout_p1) delete layout_p1;
 	if (cache) delete cache;
 	delete objdb;
@@ -45,11 +46,13 @@ void Stage::draw(glm::vec3 camPos, TXCAnimation* txc, bool picking) {
 	}
 
 	if (layout_db) layout_db->draw(camPos, cache, objdb, 0);
+	if (layout_pb) layout_pb->draw(camPos, cache, objdb, 0);
 	if (layout_p1) layout_p1->draw(camPos, cache, objdb, 0);
 
 	if (picking) {
 		if (layout_db) layout_db->draw(camPos, cache, objdb, 1);
-		if (layout_p1) layout_p1->draw(camPos, cache, objdb, 2);
+		if (layout_pb) layout_pb->draw(camPos, cache, objdb, 2);
+		if (layout_p1) layout_p1->draw(camPos, cache, objdb, 3);
 	}
 }
 
@@ -87,6 +90,11 @@ void Stage::readLayout(const char* dvdroot, const char* stgname) {
 	layout_db = new ObjectLayout();
 	layout_db->read(path_db);
 
+	sprintf(buffer, "%s/%s_PB.bin", dvdroot, stgname);
+	FSPath path_pb(buffer);
+	layout_pb = new ObjectLayout();
+	layout_pb->read(path_pb);
+
 	sprintf(buffer, "%s/%s_P1.bin", dvdroot, stgname);
 	FSPath path_p1(buffer);
 	layout_p1 = new ObjectLayout();
@@ -101,10 +109,12 @@ void Stage::readCache(FSPath& oneFile, TexDictionary* txd) {
 static int listSel = 1;
 
 void Stage::drawLayoutUI(glm::vec3 camPos) {
-	ImGui::Combo("Layout", &listSel, "None\0DB\0P1\0");
+	ImGui::Combo("Layout", &listSel, "None\0DB\0PB\0P1\0");
 	if (listSel == 1) {
 		if (layout_db) layout_db->drawUI(camPos, objdb);
 	} else if (listSel == 2) {
+		if (layout_pb) layout_pb->drawUI(camPos, objdb);
+	} else if (listSel == 3) {
 		if (layout_p1) layout_p1->drawUI(camPos, objdb);
 	}
 
@@ -288,9 +298,17 @@ void ObjectLayout::read(FSPath& binFile) {
 	Buffer b = binFile.read();
 	b.seek(0);
 
-	for (int i = 0; i < 2048; i++) {
-		InstanceData instance;
+	if (b.size() == 0) return;
 
+	for (int i = 0; i < 2048; i++) {
+		// check can read
+		if (b.remaining() < sizeof(InstanceData)) {
+			rw::util::logger.error("Invalid object layout file (unexpected EOF reading format)");
+			break;
+		}
+
+		// read data
+		InstanceData instance;
 		b.read(&instance);
 
 		if (instance.type) {
@@ -310,10 +328,10 @@ void ObjectLayout::read(FSPath& binFile) {
 
 			auto returnOffs = b.tell();
 			b.seek(0x18000u + 0x24 * instance.miscID + 0x04);
-			if (b.tell() < b.size())
+			if (((int) b.remaining()) >= 32) // todo: Buffer::remaining() should return signed (or clamp min to zero)
 				b.read(obj.misc, 32);
 			else
-				log_warn("Invalid miscID for object %d", i);
+				rw::util::logger.warn("Invalid miscID for object %d", i);
 			b.seek(returnOffs);
 		}
 	}
@@ -660,20 +678,26 @@ void ObjectLayout::buildObjectCache(ObjectInstance& object, DFFCache* cache, Obj
 	auto mapIterator = object_draw_fns.find(object.type);
 	int draw_fn;
 	if (mapIterator == object_draw_fns.end()) {
-		// determine chunk name
-		char buffer[32];
-		snprintf(buffer, 32, "%s(%d)::Draw", objdata->debugName, id);
+		// check if object is known
+		if (objdata) {
+			// determine chunk name
+			char buffer[32];
+			snprintf(buffer, 32, "%s(%d)::Draw", objdata->debugName, id);
 
-		// get chunk source
-		const char* src;
-		src = objdata->blockDraw;
+			// get chunk source
+			const char* src;
+			src = objdata->blockDraw;
 
-		if (src) {
-			// compile and get reference
-			luaL_loadbuffer(L, src, strlen(src), buffer);
-			draw_fn = luaL_ref(L, LUA_REGISTRYINDEX);
+			if (src) {
+				// compile and get reference
+				luaL_loadbuffer(L, src, strlen(src), buffer);
+				draw_fn = luaL_ref(L, LUA_REGISTRYINDEX);
+			} else {
+				// indicate that this object has no source
+				draw_fn = LUA_NOREF;
+			}
 		} else {
-			// indicate that this object has no source
+			// indicate object unknown
 			draw_fn = LUA_NOREF;
 		}
 
