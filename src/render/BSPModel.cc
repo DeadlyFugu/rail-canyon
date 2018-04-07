@@ -183,17 +183,6 @@ void BSPModel::draw(TXCAnimation* txc) {
 
 				// draw
 				bgfx::submit(0, bspProgram);
-
-				// todo: remove ---
-				// set mesh
-				bgfx::setVertexBuffer(0, section.vertices);
-				bgfx::setIndexBuffer(mesh.indices);
-
-				// set material & state
-				matList->bind(mesh.material, txc, renderBits, true);
-
-				// draw
-				bgfx::submit(1, bspProgram);
 			}
 		}
 	}

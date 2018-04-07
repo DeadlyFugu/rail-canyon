@@ -877,6 +877,7 @@ private:
 			screenshotNextFrame = 0;
 		}
 
+		// perform selection from readback result
 		if (readback_frame && readback_frame == current_frame) {
 			readback_frame = 0;
 
@@ -890,20 +891,23 @@ private:
 			setSelectedObject(list, idx);
 		}
 
-		// todo: ensure mouse not over UI element
+		// perform readback for selection
 		if (!readback_frame &&
 				glfwGetMouseButton(this->mWindow, GLFW_MOUSE_BUTTON_LEFT) &&
-				(bgfx::getCaps()->supported & BGFX_CAPS_TEXTURE_BLIT) &&
-				(bgfx::getCaps()->supported & BGFX_CAPS_TEXTURE_READ_BACK) &&
 				!ImGui::GetIO().WantCaptureMouse && txd) {
-			bgfx::blit(2, blitted, 0, 0, picking_rt);
-			bgfx::frame();
-			bgfx::frame();
-			bgfx::readTexture(blitted, blit_data);
-			bgfx::frame();
-			bgfx::frame();
-			readback_frame = current_frame + 10;
-			// todo: very sketchy; workaround as cannot get actual current frame due to BIGG's design
+			if ((bgfx::getCaps()->supported & BGFX_CAPS_TEXTURE_BLIT) &&
+				(bgfx::getCaps()->supported & BGFX_CAPS_TEXTURE_READ_BACK)) {
+				bgfx::blit(2, blitted, 0, 0, picking_rt);
+				bgfx::readTexture(blitted, blit_data);
+				bgfx::frame();
+				bgfx::frame();
+				readback_frame = current_frame + 1;
+			} else {
+				bgfx::readTexture(picking_rt, blit_data);
+				bgfx::frame();
+				bgfx::frame();
+				readback_frame = current_frame + 1;
+			}
 		}
 
 		current_frame++;

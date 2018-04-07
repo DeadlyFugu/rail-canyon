@@ -39,12 +39,16 @@ DFFModel::~DFFModel() {
 	}
 }
 
-void DFFModel::setFromClump(rw::ClumpChunk* clump, TexDictionary* txd) {
+static void static_initialize() {
 	if (!dffStaticValuesLoaded) {
 		DFFVertex::init();
 		dffProgram = bigg::loadProgram( "shaders/glsl/vs_dffmesh.bin", "shaders/glsl/fs_dffmesh.bin" );
 		dffStaticValuesLoaded = true;
 	}
+}
+
+void DFFModel::setFromClump(rw::ClumpChunk* clump, TexDictionary* txd) {
+	static_initialize();
 
 	for (auto atomicChunk : clump->atomics) {
 		auto geometry = clump->geometryList->geometries[atomicChunk->geometryIndex];
@@ -151,4 +155,47 @@ void DFFModel::draw(const glm::mat4& render_transform, int renderBits, int pick_
 			bgfx::submit(pick_color ? u8(1) : u8(0), dffProgram);
 		}
 	}
+}
+
+void DFFModel::draw_solid_box(glm::vec3 position, u32 color, int view) {
+	static bool hasData = false;
+	static bgfx::VertexBufferHandle box_vbo;
+	static bgfx::IndexBufferHandle box_ibo;
+	if (!hasData) {
+		static_initialize();
+		hasData = true;
+
+		static DFFVertex cube_verts[] = {
+				{-5.f, -5.f, -5.f, 0xffffffff, 0.f, 0.f},
+				{ 5.f, -5.f, -5.f, 0xffffffff, 0.f, 0.f},
+				{-5.f,  5.f, -5.f, 0xffffffff, 0.f, 0.f},
+				{ 5.f,  5.f, -5.f, 0xffffffff, 0.f, 0.f},
+				{-5.f, -5.f,  5.f, 0xffffffff, 0.f, 0.f},
+				{ 5.f, -5.f,  5.f, 0xffffffff, 0.f, 0.f},
+				{-5.f,  5.f,  5.f, 0xffffffff, 0.f, 0.f},
+				{ 5.f,  5.f,  5.f, 0xffffffff, 0.f, 0.f},
+		};
+
+		static u16 cube_indices[] = {
+				0, 1, 2, 1, 2, 3,
+				4, 5, 6, 5, 6, 7,
+				0, 1, 4, 1, 4, 5,
+				2, 3, 6, 3, 6, 7,
+				0, 2, 4, 2, 4, 6,
+				1, 3, 5, 3, 5, 7
+		};
+
+		box_vbo = bgfx::createVertexBuffer(bgfx::makeRef(cube_verts, sizeof(cube_verts)), DFFVertex::ms_decl);
+		box_ibo = bgfx::createIndexBuffer(bgfx::makeRef(cube_indices, sizeof(cube_indices)));
+	}
+
+	glm::mat4 transform;
+	transform = glm::translate(transform, position);
+	bgfx::setTransform(&transform[0][0]);
+	bgfx::setVertexBuffer(0, box_vbo);
+	bgfx::setIndexBuffer(box_ibo);
+
+	MaterialList::bind_color(color, true);
+
+	bgfx::submit((u8) view, dffProgram);
 }

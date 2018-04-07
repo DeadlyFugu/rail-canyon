@@ -31,5 +31,5 @@ private:
 public:
 	MaterialList(rw::MaterialListChunk* matList, TexDictionary* txd);
 	void bind(int id, TXCAnimation* txc, int renderBits, bool triList);
-	void bind_color(u32 color, int triList);
+	static void bind_color(u32 color, int triList);
 };

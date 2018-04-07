@@ -30,4 +30,5 @@ public:
 
 	void draw(glm::vec3 pos, int renderBits, int pick_color = 0);
 	void draw(const glm::mat4& transform, int renderBits, int pick_color = 0);
+	static void draw_solid_box(glm::vec3 position, u32 color, int view);
 };

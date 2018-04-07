@@ -730,15 +730,22 @@ void ObjectLayout::draw(glm::vec3 camPos, DFFCache* cache, ObjectList* objdb, in
 	};
 	int id = 0;
 	for (auto& object : objects) {
+		vec3 delta = camPos - vec3(object.pos_x,object.pos_y,object.pos_z);
+		if (delta.x*delta.x + delta.y*delta.y + delta.z*delta.z > object.radius*object.radius*10000) {
+			id++; continue;
+		}
 		u32 pick_color = (u8(picking) << 16) | (u16(id));
 		if (object.fallback_render) {
 			// debug cube render for objects without any defined render
-			ddPush();
-			ddSetTranslate(object.pos_x, object.pos_y, object.pos_z);
-			ddSetState(true, true, false);
-			if (picking) ddSetColor(pick_color | 0xff000000);
-			ddDraw(box);
-			ddPop();
+			if (picking) {
+				DFFModel::draw_solid_box(vec3(object.pos_x, object.pos_y, object.pos_z), pick_color | 0xff000000, 1);
+			} else {
+				ddPush();
+				ddSetTranslate(object.pos_x, object.pos_y, object.pos_z);
+				ddSetState(true, true, false);
+				ddDraw(box);
+				ddPop();
+			}
 		} else {
 			if (object.cache_invalid) {
 				object.cache.clear();
@@ -751,12 +758,16 @@ void ObjectLayout::draw(glm::vec3 camPos, DFFCache* cache, ObjectList* objdb, in
 				if (cached.model) {
 					cached.model->draw(model_transform * transform, cached.renderBits, picking ? pick_color : 0);
 				} else {
-					ddPush();
-					ddSetTransform(&transform);
-					ddSetState(true, true, false);
-					ddSetColor(picking ? (pick_color | 0xff000000) : 0xff8888ff);
-					ddDraw(box);
-					ddPop();
+					if (picking) {
+						DFFModel::draw_solid_box(vec3(object.pos_x, object.pos_y, object.pos_z), pick_color | 0xff000000, 1);
+					} else {
+						ddPush();
+						ddSetTransform(&transform);
+						ddSetState(true, true, false);
+						ddSetColor(0xff8888ff);
+						ddDraw(box);
+						ddPop();
+					}
 				}
 			}
 		}
