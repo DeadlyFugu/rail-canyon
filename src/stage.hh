@@ -82,6 +82,8 @@ public:
 
 	void draw(glm::vec3 camPos, DFFCache* cache, ObjectList* objdb, int picking);
 	void drawUI(glm::vec3 camPos, ObjectList* objdb);
+
+	ObjectInstance* get(int id);
 };
 
 void setSelectedObject(int list, int ob);

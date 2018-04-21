@@ -34,6 +34,7 @@ set(RAILCANYON_CC
 		# misc
 		src/misc/Help.cpp
 		src/misc/imguiUtils.cpp
+		src/misc/ImGuizmo.cpp
 
 		# io
 		src/io/ONEArchive.cc
@@ -63,6 +64,7 @@ set(RAILCANYON_HH
 		# misc
 		src/misc/Help.h
 		src/misc/imguiUtils.h
+		src/misc/ImGuizmo.h
 		
 		# io
 		src/io/ONEArchive.hh

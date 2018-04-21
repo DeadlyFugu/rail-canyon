@@ -13,6 +13,7 @@
 #include "util/config.hh"
 #include "render/DFFModel.hh"
 #include "misc/Help.h"
+#include "misc/ImGuizmo.h"
 
 const char* stageDisplayNames[] = {
 		"<none>",
@@ -702,6 +703,8 @@ private:
 
 	void update( float dt ) override {
 		mTime += dt;
+
+		ImGuizmo::BeginFrame();
 
 		// receive input
 		updateInput(dt);

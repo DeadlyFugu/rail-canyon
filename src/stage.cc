@@ -38,6 +38,13 @@ void Stage::readVisibility(FSPath& blkFile) {
 	visibilityManager.read(blkFile);
 }
 
+static int listSel = 1;
+static int obSel = 0;
+
+#include "misc/ImGuizmo.h"
+
+Camera* getCamera();
+
 void Stage::draw(glm::vec3 camPos, TXCAnimation* txc, bool picking) {
 	for (auto& model : models) {
 		if (visibilityManager.isVisible(model.getId(), camPos)) {
@@ -53,6 +60,42 @@ void Stage::draw(glm::vec3 camPos, TXCAnimation* txc, bool picking) {
 		if (layout_db) layout_db->draw(camPos, cache, objdb, 1);
 		if (layout_pb) layout_pb->draw(camPos, cache, objdb, 2);
 		if (layout_p1) layout_p1->draw(camPos, cache, objdb, 3);
+	}
+
+	ObjectLayout::ObjectInstance* ob = nullptr;
+	if (listSel == 1) {
+		ob = layout_db->get(obSel);
+	} else if (listSel == 2) {
+		ob = layout_pb->get(obSel);
+	} else if (listSel == 3) {
+		ob = layout_p1->get(obSel);
+	}
+
+	if (ob) {
+		Camera* cam = getCamera();
+		glm::mat4 view = cam->getViewMatrix();
+		glm::mat4 proj = cam->getPerspMatrix();
+		glm::mat4 model;
+
+		//glm::vec3 translation(ob->pos_x, ob->pos_y, ob->pos_z);
+		glm::vec3 translation(0, 0, 0);
+		glm::vec3 rotation(0,0,0);
+		glm::vec3 scale(1,1,1);
+
+		//ImGuizmo::RecomposeMatrixFromComponents(&translation[0], &rotation[0], &scale[0], &model[0][0]);
+
+		//ImGuizmo::Manipulate(&view[0][0], &proj[0][0],
+		//					 ImGuizmo::OPERATION::TRANSLATE, ImGuizmo::MODE::LOCAL, &model[0][0]);
+
+		ImGuizmo::DrawCube(&view[0][0], &proj[0][0], &model[0][0]);
+
+		ImGuizmo::DecomposeMatrixToComponents(&model[0][0], &translation[0], &rotation[0], &scale[0]);
+
+		/*ob->pos_x = translation.x;
+		ob->pos_y = translation.y;
+		ob->pos_z = translation.z;*/
+
+		log_debug("manip ok");
 	}
 }
 
@@ -105,8 +148,6 @@ void Stage::readCache(FSPath& oneFile, TexDictionary* txd) {
 	if (!cache) cache = new DFFCache();
 	cache->addFromArchive(oneFile, txd);
 }
-
-static int listSel = 1;
 
 void Stage::drawLayoutUI(glm::vec3 camPos) {
 	ImGui::Combo("Layout", &listSel, "None\0DB\0PB\0P1\0");
@@ -826,7 +867,6 @@ static u8* align(u8* ptr, int alignment) {
 Camera* getCamera();
 const char* getOutPath();
 const char* getStageFilename();
-static int obSel = 0;
 
 void setSelectedObject(int list, int ob) {
 	listSel = list;
@@ -839,7 +879,8 @@ void ObjectLayout::drawUI(glm::vec3 camPos, ObjectList* objdb) {
 	if (ImGui::Button("Save")) {
 		FSPath outDVDRoot(getOutPath());
 		char filename[32];
-		snprintf(filename, 32, "%s_DB.bin", getStageFilename());
+		static const char* names[] = {"DB", "PB", "P1"};
+		snprintf(filename, 32, "%s_%s.bin", getStageFilename(), names[listSel]);
 		FSPath outPath = outDVDRoot / filename;
 		write(outPath);
 	}
@@ -945,5 +986,13 @@ void ObjectLayout::drawUI(glm::vec3 camPos, ObjectList* objdb) {
 		for (int i = 0; i < 8; i++) {
 			ImGui::Text("%02x%02x%02x%02x", obj.misc[i*4+0], obj.misc[i*4+1], obj.misc[i*4+2], obj.misc[i*4+3]);
 		}
+	}
+}
+
+ObjectLayout::ObjectInstance* ObjectLayout::get(int id) {
+	if (id >= 0 && id < objects.size()) {
+		return &objects[id];
+	} else {
+		return nullptr;
 	}
 }
