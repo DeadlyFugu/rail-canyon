@@ -382,6 +382,8 @@ void ObjectLayout::write(FSPath& binFile) {
 	// create buffer to hold contents
 	Buffer b(2048 * sizeof(InstanceData) + this->objects.size() * 36, true);
 
+	// todo: check validity (i.e. object count)
+
 	// write layout
 	int miscID = 0;
 	for (auto& object : this->objects) {
@@ -404,9 +406,22 @@ void ObjectLayout::write(FSPath& binFile) {
 		data.unused_3 = 0;
 		data.miscID = miscID++;
 
+		// fix endianness
+		swapEndianness(&data.x);
+		swapEndianness(&data.y);
+		swapEndianness(&data.z);
+		swapEndianness(&data.rx);
+		swapEndianness(&data.ry);
+		swapEndianness(&data.rz);
+		swapEndianness(&data.type);
+		swapEndianness(&data.miscID);
+
 		// write to file
 		b.write(data);
 	}
+
+	// seek to beginning of misc entries
+	b.seek(0x18000);
 
 	// write misc
 	for (auto& object : this->objects) {
