@@ -46,6 +46,7 @@ set(RAILCANYON_CC
 		src/render/TXCAnimation.cc
 		src/render/DFFModel.cc
 		src/render/MaterialList.cc
+		src/render/DMAAnimation.cc
 
 		# main
 		src/railcanyon.cc
@@ -76,6 +77,7 @@ set(RAILCANYON_HH
 		src/render/TXCAnimation.hh
 		src/render/DFFModel.hh
 		src/render/MaterialList.hh
+		src/render/DMAAnimation.hh
 
 		# main
 		src/common.hh

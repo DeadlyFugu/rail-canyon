@@ -47,7 +47,7 @@ static void static_initialize() {
 	}
 }
 
-static void permute_vertex(rw::ClumpChunk* clump, int dmtarget, int vtxid, rw::geom::VertexPosition& vpos) {
+static void permute_vertex(rw::ClumpChunk* clump, int dmtarget, int vtxid, rw::geom::VertexPosition& vpos, float weight) {
 	int target_idx = 0;
 	for (auto geom : clump->geometryList->geometries) {
 		for (auto ext : geom->extensions) {
@@ -74,10 +74,10 @@ static void permute_vertex(rw::ClumpChunk* clump, int dmtarget, int vtxid, rw::g
 								if (vtxid < real_id) return;
 							}
 						}
-						auto& delta = target.points[found];
-						vpos.x += delta.x;
-						vpos.y += delta.y;
-						vpos.z += delta.z;
+						auto& delta = target.vertices[found];
+						vpos.x += delta.x * weight;
+						vpos.y += delta.y * weight;
+						vpos.z += delta.z * weight;
 						return;
 					}
 				}
@@ -87,6 +87,20 @@ static void permute_vertex(rw::ClumpChunk* clump, int dmtarget, int vtxid, rw::g
 }
 
 void DFFModel::setFromClump(rw::ClumpChunk* clump, TexDictionary* txd, int dmtarget) {
+	std::vector<float> weights;
+
+	for (int i = 0; i < dmtarget; i++) {
+		if (i == dmtarget - 1) {
+			weights.push_back(1.0f);
+		} else {
+			weights.push_back(0.0f);
+		}
+	}
+
+	setFromClump(clump, txd, &weights);
+}
+
+void DFFModel::setFromClump(rw::ClumpChunk* clump, TexDictionary* txd, std::vector<float>* dmweights) {
 	static_initialize();
 
 	for (auto atomicChunk : clump->atomics) {
@@ -117,7 +131,14 @@ void DFFModel::setFromClump(rw::ClumpChunk* clump, TexDictionary* txd, int dmtar
 				uvs.u = 0; uvs.v = 0;
 			}
 
-			if (dmtarget) permute_vertex(clump, dmtarget, i, vertex);
+			if (dmweights->size()) {
+				auto& dmwr = *dmweights;
+				for (int j = 0; j < dmwr.size(); j++) {
+					float weight = dmwr[j];
+					if (weight < 0.001f && weight > -0.001f) continue;
+					permute_vertex(clump, j, i, vertex, weight);
+				}
+			}
 
 			meshVertices[i] = {
 					vertex.x, vertex.y, vertex.z,

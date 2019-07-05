@@ -10,6 +10,7 @@
 #include "render/Camera.hh"
 #include "render/TexDictionary.hh"
 #include "render/TXCAnimation.hh"
+#include "render/DMAAnimation.hh"
 #include "util/config.hh"
 #include "render/DFFModel.hh"
 #include "misc/Help.h"
@@ -257,8 +258,13 @@ private:
 	TexDictionary* txd_common = nullptr;
 	TXCAnimation* txc = nullptr;
 	DFFModel* dff = nullptr;
+	DMAAnimation* dma = nullptr;
 	std::vector<std::string> morphtargets;
 	int cur_target = 0;
+	std::vector<const char*> archiveDFFs;
+	int dffSelect = 0;
+	ONEArchive* one;
+	bool useDMA = false;
 
 	bgfx::TextureHandle picking_rt;
 	bgfx::TextureHandle picking_rt_depth;
@@ -470,11 +476,9 @@ private:
 
 		if (stageSelect == 1) { // <DFF>
 			static char archivePath[128];
-			static std::vector<const char*> archiveDFFs;
 			static bool archiveExists = false;
 			static bool archiveExistsDirty = true;
-			static int dffSelect = 0;
-			static ONEArchive* one;
+			static int dmaSelect = 0;
 
 			if (ImGui::InputText("ONE archive", archivePath, 128)) archiveExistsDirty = true;
 
@@ -526,17 +530,28 @@ private:
 					}
 					delete clump;
 				}
-				if (morphtargets.size() > 1) {
+				ImGui::Checkbox("use DMA", &useDMA);
+				if (morphtargets.size() > 1 && !useDMA) {
 					std::vector<const char*> target_charps;
 					for (auto& target : morphtargets) {
 						target_charps.push_back(target.c_str());
 					}
 					if (ImGui::Combo("dmtarget", &cur_target, &target_charps[0], (int) target_charps.size())) {
+						if (dff) delete dff;
 						dff = new DFFModel();
 						Buffer b = one->readFile(archiveDFFs[dffSelect]);
 						rw::ClumpChunk* clump = (rw::ClumpChunk*) rw::readChunk(b);
 						dff->setFromClump(clump, txd, cur_target);
 						delete clump;
+					}
+				} else if (morphtargets.size() > 1) {
+					if (ImGui::Combo("dma", &dmaSelect, &archiveDFFs[0], (int) archiveDFFs.size())) {
+						if (dma) delete dma;
+						dma = new DMAAnimation();
+						Buffer b = one->readFile(archiveDFFs[dmaSelect]);
+						auto chunk = (rw::DMorphAnimationChunk*) rw::readChunk(b);
+						dma->loadFromChunk(chunk);
+						delete chunk;
 					}
 				}
 			} else {
@@ -852,6 +867,36 @@ private:
 
 		if (txc) {
 			txc->setTime(mTime);
+		}
+
+		// play DMA animation
+		if (useDMA && dma && dff && one) {
+			dma->advanceTime(dt);
+			dma->dumpDebug();
+
+			int best_target = 0;
+			float best_weight = 0.5f;
+
+			std::vector<float> weights;
+			
+			for (int i = 0; i < dma->getTargetCount(); i++) {
+				const auto weight = dma->getTargetValue(i);
+				if (weight > best_weight) {
+					best_target = i + 1;
+					best_weight = weight;
+				}
+				weights.push_back(weight);
+			}
+
+			if (true /*best_target != cur_target*/) {
+				cur_target = best_target;
+				if (dff) delete dff;
+				dff = new DFFModel();
+				Buffer b = one->readFile(archiveDFFs[dffSelect]);
+				rw::ClumpChunk* clump = (rw::ClumpChunk*) rw::readChunk(b);
+				dff->setFromClump(clump, txd, &weights);
+				delete clump;
+			}
 		}
 
 		// calculate picking view
