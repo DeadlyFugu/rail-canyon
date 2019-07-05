@@ -257,6 +257,8 @@ private:
 	TexDictionary* txd_common = nullptr;
 	TXCAnimation* txc = nullptr;
 	DFFModel* dff = nullptr;
+	std::vector<std::string> morphtargets;
+	int cur_target = 0;
 
 	bgfx::TextureHandle picking_rt;
 	bgfx::TextureHandle picking_rt_depth;
@@ -504,11 +506,38 @@ private:
 			if (archiveExists && archiveDFFs.size() > 0) {
 				if (ImGui::Combo("dff", &dffSelect, &archiveDFFs[0], (int) archiveDFFs.size())) {
 					if (dff) delete dff;
+					morphtargets.clear();
+					cur_target = 0;
 					dff = new DFFModel();
 					Buffer b = one->readFile(archiveDFFs[dffSelect]);
 					rw::ClumpChunk* clump = (rw::ClumpChunk*) rw::readChunk(b);
 					dff->setFromClump(clump, txd);
+					morphtargets.push_back("<none>");
+					for (auto geom : clump->geometryList->geometries) {
+						for (auto ext : geom->extensions) {
+							for (auto& chunk : ((rw::ListChunk*) ext)->children) {
+								if (chunk->type != RW_DELTA_MORPH_PLG) continue;
+
+								for (auto& target : ((rw::DeltaMorphPLGChunk*) chunk)->targets) {
+									morphtargets.push_back(target.name);
+								}
+							}
+						}
+					}
 					delete clump;
+				}
+				if (morphtargets.size() > 1) {
+					std::vector<const char*> target_charps;
+					for (auto& target : morphtargets) {
+						target_charps.push_back(target.c_str());
+					}
+					if (ImGui::Combo("dmtarget", &cur_target, &target_charps[0], (int) target_charps.size())) {
+						dff = new DFFModel();
+						Buffer b = one->readFile(archiveDFFs[dffSelect]);
+						rw::ClumpChunk* clump = (rw::ClumpChunk*) rw::readChunk(b);
+						dff->setFromClump(clump, txd, cur_target);
+						delete clump;
+					}
 				}
 			} else {
 				ImGui::TextColored(ImVec4(1.0f, 0.25f, 0.0f, 1.0f), "No archive is chosen");

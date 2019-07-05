@@ -26,7 +26,7 @@ private:
 public:
 	~DFFModel();
 
-	void setFromClump(rw::ClumpChunk* clump, TexDictionary* txd);
+	void setFromClump(rw::ClumpChunk* clump, TexDictionary* txd, int dmtarget = 0);
 
 	void draw(glm::vec3 pos, int renderBits, int pick_color = 0);
 	void draw(const glm::mat4& transform, int renderBits, int pick_color = 0);

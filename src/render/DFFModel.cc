@@ -47,7 +47,46 @@ static void static_initialize() {
 	}
 }
 
-void DFFModel::setFromClump(rw::ClumpChunk* clump, TexDictionary* txd) {
+static void permute_vertex(rw::ClumpChunk* clump, int dmtarget, int vtxid, rw::geom::VertexPosition& vpos) {
+	int target_idx = 0;
+	for (auto geom : clump->geometryList->geometries) {
+		for (auto ext : geom->extensions) {
+			for (auto& chunk : ((rw::ListChunk*) ext)->children) {
+				if (chunk->type != RW_DELTA_MORPH_PLG) continue;
+
+				for (auto& target : ((rw::DeltaMorphPLGChunk*) chunk)->targets) {
+					target_idx++;
+					if (dmtarget == target_idx) {
+						int real_id = 0;
+						int cmpr_id = 0;
+						int found = -1;
+						for (auto& mpctrl : target.mapping) {
+							if (mpctrl & 0x80) {
+								int count = mpctrl & 0x7f;
+								if (vtxid < real_id + count) {
+									found = vtxid - real_id + cmpr_id;
+									break;
+								}
+								real_id += count;
+								cmpr_id += count;
+							} else {
+								real_id += mpctrl;
+								if (vtxid < real_id) return;
+							}
+						}
+						auto& delta = target.points[found];
+						vpos.x += delta.x;
+						vpos.y += delta.y;
+						vpos.z += delta.z;
+						return;
+					}
+				}
+			}
+		}
+	}
+}
+
+void DFFModel::setFromClump(rw::ClumpChunk* clump, TexDictionary* txd, int dmtarget) {
 	static_initialize();
 
 	for (auto atomicChunk : clump->atomics) {
@@ -65,7 +104,7 @@ void DFFModel::setFromClump(rw::ClumpChunk* clump, TexDictionary* txd) {
 		DFFVertex* meshVertices = new DFFVertex[geometry->vertexCount];
 
 		for (int i = 0; i < geometry->vertexCount; i++) {
-			const auto& vertex = target0.vertexPositions[i];
+			rw::geom::VertexPosition vertex = target0.vertexPositions[i];
 
 			rw::geom::VertexColor color;
 			if (geometry->vertexColors.size()) color = geometry->vertexColors[i];
@@ -77,6 +116,8 @@ void DFFModel::setFromClump(rw::ClumpChunk* clump, TexDictionary* txd) {
 			} else {
 				uvs.u = 0; uvs.v = 0;
 			}
+
+			if (dmtarget) permute_vertex(clump, dmtarget, i, vertex);
 
 			meshVertices[i] = {
 					vertex.x, vertex.y, vertex.z,
